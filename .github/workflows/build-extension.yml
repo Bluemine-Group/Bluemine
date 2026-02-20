@@ -1,0 +1,38 @@
+name: Build Extension ZIP
+
+on:
+  push:
+    branches:
+      - "**"
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Prepare package directory
+        run: |
+          mkdir -p package/bluemine
+          rsync -av \
+            --exclude '.git/' \
+            --exclude '.github/' \
+            --exclude 'package/' \
+            --exclude '*.zip' \
+            ./ package/bluemine/
+
+      - name: Create zip artifact
+        run: |
+          cd package
+          zip -r bluemine-extension.zip bluemine
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bluemine-extension
+          path: package/bluemine-extension.zip

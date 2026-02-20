@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bluemine Settings</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="popup">
+      <h1>Bluemine</h1>
+      <p class="subtitle">Opt-in Redmine improvements</p>
+
+      <section class="setting-group">
+        <label class="field-label" for="redmine-url">Redmine Base URL</label>
+        <div class="field-row">
+          <input
+            id="redmine-url"
+            class="text-input"
+            type="url"
+            placeholder="https://redmine.example.com"
+            spellcheck="false"
+          />
+          <button id="save-redmine-url" type="button" class="button">Save</button>
+        </div>
+      </section>
+
+      <label class="toggle-row" for="hello-world-toggle">
+        <span>Enable Hello World Improvement</span>
+        <input id="hello-world-toggle" type="checkbox" />
+      </label>
+
+      <p id="status" class="status" aria-live="polite"></p>
+    </main>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

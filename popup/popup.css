@@ -1,0 +1,105 @@
+:root {
+  --bg: #0f172a;
+  --panel: #111827;
+  --text: #e5e7eb;
+  --muted: #94a3b8;
+  --accent: #38bdf8;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  min-width: 320px;
+  background: radial-gradient(circle at top right, #1e293b 0%, var(--bg) 55%);
+  color: var(--text);
+}
+
+.popup {
+  padding: 16px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.subtitle {
+  margin: 4px 0 14px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.setting-group {
+  margin-bottom: 12px;
+}
+
+.field-label {
+  display: block;
+  margin: 0 0 6px;
+  font-size: 0.83rem;
+  color: var(--muted);
+}
+
+.field-row {
+  display: flex;
+  gap: 8px;
+}
+
+.text-input {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 10px;
+  border-radius: 8px;
+  border: 1px solid #334155;
+  background: #0b1222;
+  color: var(--text);
+}
+
+.text-input:focus {
+  outline: 1px solid var(--accent);
+  border-color: var(--accent);
+}
+
+.button {
+  padding: 9px 12px;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  background: #0d1b34;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.button:hover {
+  border-color: var(--accent);
+}
+
+.toggle-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #1f2937;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--panel) 88%, #000 12%);
+  cursor: pointer;
+  font-size: 0.92rem;
+}
+
+.toggle-row input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.status {
+  min-height: 1.2em;
+  margin: 10px 2px 0;
+  font-size: 0.82rem;
+  color: var(--accent);
+}
