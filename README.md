@@ -14,6 +14,7 @@ Our first theme target is a dark blue mode for better low-light usability.
 ### Current feature(s)
 
 - Hello World Improvement (sample opt-in feature toggle)
+- GitLab MR status on Agile board cards/stories (auto-runs when mapped project + GitLab settings exist)
 
 ### Coming soon
 
@@ -24,15 +25,16 @@ Our first theme target is a dark blue mode for better low-light usability.
 - Automatic background polling to sync changes on the Agile task board
 - AI support for adding tasks (bring your own API key, scoped per project)
 - AI writing support inside tasks (bring your own API key, scoped per project)
-- GitLab integration to show MR status on related tasks (bring your own GitLab URL and API key, including self-hosted)
 - Open clicked task in a sidebar from the Agile board
 - Bugfix: remember scroll position when returning from task details to the Agile board with browser back
 
 ## How It Works
 
 - Bluemine runs only when a Redmine site is open.
-- Configure your exact Redmine base URL at the top of the extension settings.
+- Redmine pages are auto-detected from response headers (`Set-Cookie` containing `_redmine_session`).
 - It uses the Redmine page/session context to interact with Redmine APIs.
+- GitLab MR API calls are executed from the extension background context via message passing (avoids page-context CORS issues).
+- GitLab API keys are read and used only in extension storage/background context, not in page context.
 - Every improvement in Bluemine is individually opt-in.
 - The extension popup is a settings menu with feature toggles.
 - Some features include additional configuration fields.
