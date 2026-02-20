@@ -8,10 +8,14 @@
   </head>
   <body>
     <main class="popup">
-      <h1>Bluemine</h1>
-      <p class="subtitle">Opt-in Redmine improvements</p>
+      <div class="atmosphere" aria-hidden="true"></div>
+      <header class="header">
+        <p class="eyebrow">Redmine Toolkit</p>
+        <h1>Bluemine</h1>
+        <p class="subtitle">Opt-in improvements with sharp control.</p>
+      </header>
 
-      <section class="setting-group">
+      <section class="section setting-group">
         <label class="field-label" for="redmine-url">Redmine Base URL</label>
         <div class="field-row">
           <input
@@ -25,12 +29,20 @@
         </div>
       </section>
 
-      <label class="toggle-row" for="hello-world-toggle">
-        <span>Enable Hello World Improvement</span>
-        <input id="hello-world-toggle" type="checkbox" />
-      </label>
+      <section class="section">
+        <label class="toggle-row" for="hello-world-toggle">
+          <div class="toggle-copy">
+            <span class="toggle-title">Hello World Improvement</span>
+            <span class="toggle-subtitle">Enable lightweight enhancement in Redmine.</span>
+          </div>
+          <span class="switch-shell">
+            <input id="hello-world-toggle" type="checkbox" />
+            <span class="switch-ui" aria-hidden="true"></span>
+          </span>
+        </label>
+      </section>
 
-      <p id="status" class="status" aria-live="polite"></p>
+      <p id="status" class="status" aria-live="polite" role="status"></p>
     </main>
 
     <script src="popup.js"></script>
