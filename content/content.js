@@ -21,6 +21,7 @@ const MR_CARD_STATUS_SIGNATURE_ATTRIBUTE =
 const MR_STORY_STATUS_SIGNATURE_ATTRIBUTE =
   "data-bluemine-mr-story-status-signature";
 const MR_DETAIL_SIGNATURE_ATTRIBUTE = "data-bluemine-mr-detail-signature";
+const REDMINE_REVIEWER_NAME_ATTRIBUTE = "data-bluemine-redmine-reviewer-name";
 const GITLAB_ICON_PATH =
   "M22.547 13.374l-2.266-6.977a.783.783 0 0 0-.744-.53h-3.03L12 19.78 7.494 5.867H4.463a.783.783 0 0 0-.744.53l-2.266 6.977a1.523 1.523 0 0 0 .553 1.704L12 22.422l9.994-7.344a1.523 1.523 0 0 0 .553-1.704Z";
 let hasRegisteredScrollTracker = false;
@@ -587,9 +588,7 @@ function ensureMrStylesInjected() {
     .${MR_ATTRIBUTE_LINE_CLASS} .bluemine-gitlab-icon-link {
       display: inline-flex;
       align-items: center;
-      margin-left: 4px;
       color: #1f2e44;
-      vertical-align: middle;
       text-decoration: none;
       opacity: 0.9;
     }
@@ -693,6 +692,26 @@ function normalizePersonName(name) {
     .trim()
     .replace(/\s+/g, " ")
     .toLowerCase();
+}
+
+function getNormalizedReviewerNames(reviewers) {
+  if (!Array.isArray(reviewers)) {
+    return [];
+  }
+
+  const normalizedNames = [];
+  const seenNames = new Set();
+  reviewers.forEach((reviewer) => {
+    const normalizedName = normalizePersonName(reviewer?.name);
+    if (!normalizedName || seenNames.has(normalizedName)) {
+      return;
+    }
+
+    seenNames.add(normalizedName);
+    normalizedNames.push(normalizedName);
+  });
+
+  return normalizedNames;
 }
 
 function buildIssueMrMap(mergeRequests) {
@@ -832,9 +851,7 @@ function createMrStatusNode(relatedMergeRequests, options = {}) {
           }),
         );
       } else {
-        wrapper.appendChild(
-          createMrMetaBadge(commentsText, "is-comments"),
-        );
+        wrapper.appendChild(createMrMetaBadge(commentsText, "is-comments"));
       }
     }
   }
@@ -882,7 +899,10 @@ function buildMrStatusSignature(relatedMergeRequests, options = {}) {
   });
 }
 
-function buildMrDetailSignature(primaryMergeRequest) {
+function buildMrDetailSignature(primaryMergeRequest, options = {}) {
+  const normalizedRedmineReviewerName = normalizePersonName(
+    options.redmineReviewerName,
+  );
   if (!primaryMergeRequest) {
     return "";
   }
@@ -896,6 +916,7 @@ function buildMrDetailSignature(primaryMergeRequest) {
   }
 
   return JSON.stringify({
+    redmineReviewerName: hasReviewer ? normalizedRedmineReviewerName : "",
     reviewers: hasReviewer
       ? {
           url: String(primaryMergeRequest.url || ""),
@@ -1041,14 +1062,22 @@ function applyStatusesToStoryRows(issueMrMap, options = {}) {
   });
 }
 
-function findReviewerLineInsertionReference(attributesNode) {
-  const reviewerLabel = Array.from(attributesNode.querySelectorAll("b")).find(
-    (labelNode) =>
+function findNativeReviewerLabel(attributesNode) {
+  return Array.from(attributesNode.querySelectorAll("b")).find((labelNode) => {
+    const isReviewerLabel =
       String(labelNode.textContent || "")
         .trim()
-        .toLowerCase() === "reviewer",
-  );
+        .toLowerCase() === "reviewer";
+    if (!isReviewerLabel) {
+      return false;
+    }
 
+    return !labelNode.closest(`.${MR_ATTRIBUTE_LINE_CLASS}`);
+  });
+}
+
+function findReviewerLineInsertionReference(attributesNode) {
+  const reviewerLabel = findNativeReviewerLabel(attributesNode);
   if (!reviewerLabel) {
     return null;
   }
@@ -1066,12 +1095,7 @@ function findReviewerLineInsertionReference(attributesNode) {
 }
 
 function getRedmineReviewerName(attributesNode) {
-  const reviewerLabel = Array.from(attributesNode.querySelectorAll("b")).find(
-    (labelNode) =>
-      String(labelNode.textContent || "")
-        .trim()
-        .toLowerCase() === "reviewer",
-  );
+  const reviewerLabel = findNativeReviewerLabel(attributesNode);
   if (!reviewerLabel) {
     return "";
   }
@@ -1095,31 +1119,51 @@ function getRedmineReviewerName(attributesNode) {
   return reviewerName.replace(/^:\s*/, "").trim();
 }
 
-function shouldOnlyShowGitlabReviewer(attributesNode, reviewers) {
-  const redmineReviewerName = normalizePersonName(
-    getRedmineReviewerName(attributesNode),
+function rememberRedmineReviewerName(attributesNode) {
+  const redmineReviewerName = getRedmineReviewerName(attributesNode);
+  if (redmineReviewerName) {
+    attributesNode.setAttribute(
+      REDMINE_REVIEWER_NAME_ATTRIBUTE,
+      redmineReviewerName,
+    );
+    return redmineReviewerName;
+  }
+
+  return String(
+    attributesNode.getAttribute(REDMINE_REVIEWER_NAME_ATTRIBUTE) || "",
+  ).trim();
+}
+
+function ensureRedmineReviewerLine(attributesNode, reviewerName) {
+  const trimmedReviewerName = String(reviewerName || "").trim();
+  if (!trimmedReviewerName) {
+    return;
+  }
+
+  if (findNativeReviewerLabel(attributesNode)) {
+    return;
+  }
+
+  const lineNode = document.createDocumentFragment();
+  const labelNode = document.createElement("b");
+  labelNode.textContent = "Reviewer";
+  lineNode.appendChild(labelNode);
+  lineNode.appendChild(document.createTextNode(": "));
+  lineNode.appendChild(document.createTextNode(trimmedReviewerName));
+  lineNode.appendChild(document.createElement("br"));
+
+  const firstGitlabLine = attributesNode.querySelector(
+    `.${MR_ATTRIBUTE_LINE_CLASS}`,
   );
-  if (!redmineReviewerName) {
-    return false;
+  if (firstGitlabLine && firstGitlabLine.parentNode === attributesNode) {
+    attributesNode.insertBefore(lineNode, firstGitlabLine);
+  } else {
+    attributesNode.appendChild(lineNode);
   }
-
-  const normalizedGitlabReviewerNames = reviewers
-    .map((reviewer) => normalizePersonName(reviewer?.name))
-    .filter(Boolean);
-  if (normalizedGitlabReviewerNames.length === 0) {
-    return false;
-  }
-
-  return normalizedGitlabReviewerNames.includes(redmineReviewerName);
 }
 
 function removeRedmineReviewerLine(attributesNode) {
-  const reviewerLabel = Array.from(attributesNode.querySelectorAll("b")).find(
-    (labelNode) =>
-      String(labelNode.textContent || "")
-        .trim()
-        .toLowerCase() === "reviewer",
-  );
+  const reviewerLabel = findNativeReviewerLabel(attributesNode);
   if (!reviewerLabel) {
     return;
   }
@@ -1136,13 +1180,10 @@ function removeRedmineReviewerLine(attributesNode) {
   }
 }
 
-function createReviewerValueNode(reviewers, options = {}) {
-  const { iconUrl = "" } = options;
-  const valueNode = document.createElement("span");
-
+function appendReviewerNames(targetNode, reviewers) {
   reviewers.forEach((reviewer, index) => {
     if (index > 0) {
-      valueNode.appendChild(document.createTextNode(", "));
+      targetNode.appendChild(document.createTextNode(", "));
     }
 
     if (reviewer.url) {
@@ -1152,16 +1193,44 @@ function createReviewerValueNode(reviewers, options = {}) {
       reviewerLink.target = "_blank";
       reviewerLink.rel = "noopener noreferrer";
       reviewerLink.textContent = reviewer.name;
-      valueNode.appendChild(reviewerLink);
+      targetNode.appendChild(reviewerLink);
       return;
     }
 
-    valueNode.appendChild(document.createTextNode(reviewer.name));
+    targetNode.appendChild(document.createTextNode(reviewer.name));
   });
+}
+
+function createReviewerValueNode(reviewers, options = {}) {
+  const { iconUrl = "", redmineReviewerName = "" } = options;
+  const redmineName = String(redmineReviewerName || "").trim();
+  const normalizedRedmineName = normalizePersonName(redmineName);
+  const normalizedGitlabNames = getNormalizedReviewerNames(reviewers);
+  const hasSameSingleReviewerName =
+    Boolean(normalizedRedmineName) &&
+    normalizedGitlabNames.length === 1 &&
+    normalizedGitlabNames[0] === normalizedRedmineName;
+
+  const valueNode = document.createElement("span");
+  valueNode.appendChild(document.createTextNode(redmineName || "none"));
+
+  const detailsNode = document.createElement("span");
+  if (!hasSameSingleReviewerName) {
+    appendReviewerNames(detailsNode, reviewers);
+  }
 
   const iconLink = createGitlabIconLink(iconUrl, "Open GitLab merge request");
   if (iconLink) {
-    valueNode.appendChild(iconLink);
+    if (detailsNode.childNodes.length > 0) {
+      detailsNode.appendChild(document.createTextNode(" "));
+    }
+    detailsNode.appendChild(iconLink);
+  }
+
+  if (detailsNode.childNodes.length > 0) {
+    valueNode.appendChild(document.createTextNode(" ("));
+    valueNode.appendChild(detailsNode);
+    valueNode.appendChild(document.createTextNode(")"));
   }
 
   return valueNode;
@@ -1238,13 +1307,19 @@ function applyDetailsToCardIssues(issueMrMap, options = {}) {
     const issueId = String(issueCard.getAttribute("data-id") || "").trim();
     const relatedMergeRequests = issueId ? issueMrMap.get(issueId) : null;
     const primaryMergeRequest = relatedMergeRequests?.[0];
-    const nextSignature = buildMrDetailSignature(primaryMergeRequest);
+    const redmineReviewerName = rememberRedmineReviewerName(attributesNode);
+    const nextSignature = buildMrDetailSignature(primaryMergeRequest, {
+      redmineReviewerName,
+    });
     const previousSignature = String(
       attributesNode.getAttribute(MR_DETAIL_SIGNATURE_ATTRIBUTE) || "",
     );
     const hasExistingDetailLines = Boolean(
       attributesNode.querySelector(`.${MR_ATTRIBUTE_LINE_CLASS}`),
     );
+    if (!primaryMergeRequest?.hasReviewer) {
+      ensureRedmineReviewerLine(attributesNode, redmineReviewerName);
+    }
 
     if (!nextSignature) {
       if (hasExistingDetailLines) {
@@ -1273,13 +1348,7 @@ function applyDetailsToCardIssues(issueMrMap, options = {}) {
     }
 
     const insertBeforeNode = findReviewerLineInsertionReference(attributesNode);
-    if (
-      primaryMergeRequest.hasReviewer &&
-      shouldOnlyShowGitlabReviewer(
-        attributesNode,
-        primaryMergeRequest.reviewers,
-      )
-    ) {
+    if (primaryMergeRequest.hasReviewer) {
       removeRedmineReviewerLine(attributesNode);
     }
 
@@ -1290,6 +1359,7 @@ function applyDetailsToCardIssues(issueMrMap, options = {}) {
           "Reviewer",
           createReviewerValueNode(primaryMergeRequest.reviewers, {
             iconUrl: primaryMergeRequest.url,
+            redmineReviewerName,
           }),
           { animate },
         ),
@@ -1620,11 +1690,13 @@ async function runGitlabMrStatusFeature() {
   const requestMetricsSummary = createGitlabRequestMetricsSummary();
   ensureMrStylesInjected();
   const boardIssueIds = collectBoardIssueIds();
-  const boardCacheKey = normalizePageUrl(window.location.href) || boardProjectName;
+  const boardCacheKey =
+    normalizePageUrl(window.location.href) || boardProjectName;
   const hasVisibleOverlayAtStart = Boolean(
     document.getElementById(SCROLL_RESTORE_OVERLAY_ID),
   );
-  const canCreateOverlayForGitlab = !hasVisibleOverlayAtStart &&
+  const canCreateOverlayForGitlab =
+    !hasVisibleOverlayAtStart &&
     getNavigationType() === "reload" &&
     boardIssueIds.length > 0;
   if (hasVisibleOverlayAtStart) {
@@ -1633,8 +1705,8 @@ async function runGitlabMrStatusFeature() {
     setScrollRestoreOverlayHoldForGitlab(true);
   }
   const isGitlabReady = await isGitlabProjectReady(boardProjectName);
-  const shouldWaitForGitlabCachedInjection = isGitlabReady &&
-    (hasVisibleOverlayAtStart || canCreateOverlayForGitlab);
+  const shouldWaitForGitlabCachedInjection =
+    isGitlabReady && (hasVisibleOverlayAtStart || canCreateOverlayForGitlab);
   if (shouldWaitForGitlabCachedInjection && canCreateOverlayForGitlab) {
     ensureScrollRestoreOverlay();
     setScrollRestoreOverlayHoldForGitlab(true);
@@ -1722,7 +1794,10 @@ async function runGitlabMrStatusFeature() {
       const avatarRequestMetrics = await avatarMetricsPromise;
       mergeGitlabRequestMetrics(requestMetricsSummary, avatarRequestMetrics);
     } catch (error) {
-      console.warn("[Bluemine] Failed to apply GitLab assignee avatars:", error);
+      console.warn(
+        "[Bluemine] Failed to apply GitLab assignee avatars:",
+        error,
+      );
     }
 
     const durationMs = Math.max(0, Math.round(performance.now() - startTimeMs));
