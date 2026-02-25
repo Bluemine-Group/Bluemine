@@ -547,11 +547,6 @@ function ensureMrStylesInjected() {
       color: #8d5a06;
     }
 
-    .${MR_CONTAINER_CLASS} .bluemine-mr-meta.is-comments {
-      background: #edf4ff;
-      color: #184f95;
-    }
-
     .${MR_CONTAINER_CLASS} .bluemine-mr-reviewer-text {
       display: inline-flex;
       align-items: center;
@@ -687,6 +682,20 @@ function getResolvedCounts(mergeRequest) {
   return { resolved, total };
 }
 
+function getMergeRequestStatusLabel(mergeRequest) {
+  const stateLabel = String(mergeRequest?.stateLabel || "").trim() || "Unknown";
+  if (mergeRequest?.stateClassName !== "is-open") {
+    return stateLabel;
+  }
+
+  const { resolved, total } = getResolvedCounts(mergeRequest);
+  if (total === 0) {
+    return stateLabel;
+  }
+
+  return `${stateLabel} ${resolved}/${total}`;
+}
+
 function normalizePersonName(name) {
   return String(name || "")
     .trim()
@@ -791,8 +800,6 @@ function formatReviewerNames(reviewers) {
 function createMrStatusNode(relatedMergeRequests, options = {}) {
   const includeReviewerBadge = Boolean(options.includeReviewerBadge);
   const includeApprovedBadge = Boolean(options.includeApprovedBadge);
-  const includeResolvedBadge = Boolean(options.includeResolvedBadge);
-  const renderResolvedAsText = Boolean(options.renderResolvedAsText);
   const animate = options.animate !== false;
   const wrapper = document.createElement("span");
   wrapper.className = animate
@@ -809,11 +816,11 @@ function createMrStatusNode(relatedMergeRequests, options = {}) {
     link.href = mergeRequest.url;
     link.target = "_blank";
     link.rel = "noopener noreferrer";
-    link.textContent = mergeRequest.stateLabel;
+    link.textContent = getMergeRequestStatusLabel(mergeRequest);
     wrapper.appendChild(link);
   }
 
-  if (includeReviewerBadge || includeApprovedBadge || includeResolvedBadge) {
+  if (includeReviewerBadge || includeApprovedBadge) {
     const primaryMergeRequest = relatedMergeRequests[0];
     if (includeReviewerBadge && primaryMergeRequest?.hasReviewer) {
       wrapper.appendChild(
@@ -834,25 +841,6 @@ function createMrStatusNode(relatedMergeRequests, options = {}) {
       !isMergedMergeRequest(primaryMergeRequest)
     ) {
       wrapper.appendChild(createMrMetaBadge("Approved \u2713", "is-approved"));
-    }
-
-    if (
-      includeResolvedBadge &&
-      !isMergedMergeRequest(primaryMergeRequest) &&
-      primaryMergeRequest?.totalComments > 0
-    ) {
-      const { resolved, total } = getResolvedCounts(primaryMergeRequest);
-      const commentsText = `${resolved}/${total} comments`;
-      if (renderResolvedAsText) {
-        wrapper.appendChild(
-          createMrReviewerText(commentsText, {
-            iconUrl: primaryMergeRequest.url,
-            iconLabel: "Open GitLab merge request",
-          }),
-        );
-      } else {
-        wrapper.appendChild(createMrMetaBadge(commentsText, "is-comments"));
-      }
     }
   }
 
@@ -892,8 +880,6 @@ function buildMrStatusSignature(relatedMergeRequests, options = {}) {
   return JSON.stringify({
     includeReviewerBadge: Boolean(options.includeReviewerBadge),
     includeApprovedBadge: Boolean(options.includeApprovedBadge),
-    includeResolvedBadge: Boolean(options.includeResolvedBadge),
-    renderResolvedAsText: Boolean(options.renderResolvedAsText),
     mergeRequests:
       buildMergeRequestRenderSignaturePayload(relatedMergeRequests),
   });
@@ -908,10 +894,7 @@ function buildMrDetailSignature(primaryMergeRequest, options = {}) {
   }
 
   const hasReviewer = Boolean(primaryMergeRequest.hasReviewer);
-  const showsResolved =
-    !isMergedMergeRequest(primaryMergeRequest) &&
-    primaryMergeRequest.totalComments > 0;
-  if (!hasReviewer && !showsResolved) {
+  if (!hasReviewer) {
     return "";
   }
 
@@ -928,7 +911,6 @@ function buildMrDetailSignature(primaryMergeRequest, options = {}) {
             : [],
         }
       : null,
-    resolved: showsResolved ? getResolvedCounts(primaryMergeRequest) : null,
   });
 }
 
@@ -1014,8 +996,6 @@ function applyStatusesToStoryRows(issueMrMap, options = {}) {
     const nextSignature = buildMrStatusSignature(relatedMergeRequests, {
       includeReviewerBadge: true,
       includeApprovedBadge: true,
-      includeResolvedBadge: true,
-      renderResolvedAsText: true,
     });
     const previousSignature = String(
       storyCell.getAttribute(MR_STORY_STATUS_SIGNATURE_ATTRIBUTE) || "",
@@ -1049,8 +1029,6 @@ function applyStatusesToStoryRows(issueMrMap, options = {}) {
     const statusNode = createMrStatusNode(relatedMergeRequests, {
       includeReviewerBadge: true,
       includeApprovedBadge: true,
-      includeResolvedBadge: true,
-      renderResolvedAsText: true,
       animate,
     });
     if (!statusNode) {
@@ -1363,18 +1341,6 @@ function applyDetailsToCardIssues(issueMrMap, options = {}) {
           }),
           { animate },
         ),
-      );
-    }
-
-    if (
-      !isMergedMergeRequest(primaryMergeRequest) &&
-      primaryMergeRequest.totalComments > 0
-    ) {
-      const { resolved, total } = getResolvedCounts(primaryMergeRequest);
-      linesToInsert.push(
-        createGitlabAttributeLine("", `${resolved}/${total} comments`, {
-          animate,
-        }),
       );
     }
 
