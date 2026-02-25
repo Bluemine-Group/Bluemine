@@ -15,6 +15,7 @@ Our first theme target is a dark blue mode for better low-light usability.
 
 - Hello World Improvement (sample opt-in feature toggle)
 - GitLab MR status on Agile board cards/stories (auto-runs when mapped project + GitLab settings exist)
+- Restore Agile board scroll position when reloading the same board page
 
 ### Coming soon
 
@@ -26,7 +27,6 @@ Our first theme target is a dark blue mode for better low-light usability.
 - AI support for adding tasks (bring your own API key, scoped per project)
 - AI writing support inside tasks (bring your own API key, scoped per project)
 - Open clicked task in a sidebar from the Agile board
-- Bugfix: remember scroll position when returning from task details to the Agile board with browser back
 
 ## How It Works
 
