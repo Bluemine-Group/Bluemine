@@ -36,33 +36,6 @@
     return Boolean(getCurrentBoardProjectName());
   }
 
-  function getNavigationType() {
-    const navigationEntries =
-      typeof performance.getEntriesByType === "function"
-        ? performance.getEntriesByType("navigation")
-        : [];
-    const navigationEntry = navigationEntries?.[0];
-    if (navigationEntry && typeof navigationEntry.type === "string") {
-      return navigationEntry.type;
-    }
-
-    if (performance.navigation) {
-      if (performance.navigation.type === 1) {
-        return "reload";
-      }
-
-      if (performance.navigation.type === 2) {
-        return "back_forward";
-      }
-
-      if (performance.navigation.type === 0) {
-        return "navigate";
-      }
-    }
-
-    return "unknown";
-  }
-
   function readStoredScrollRestoreState() {
     try {
       const rawState = window.sessionStorage.getItem(SCROLL_RESTORE_STATE_KEY);
@@ -136,10 +109,6 @@
   const storedState = readStoredScrollRestoreState();
   if (storedState && storedState.pageUrl === initialPageUrl) {
     ensureScrollRestoreOverlay();
-    return;
-  }
-
-  if (getNavigationType() !== "reload") {
     return;
   }
 
