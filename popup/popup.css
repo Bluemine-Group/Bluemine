@@ -40,7 +40,7 @@ body {
 .hero {
     position: relative;
     margin-bottom: 14px;
-    padding: 0 38px 0 2px;
+    padding: 0 30px 0 2px;
 }
 
 .hero-identity {
@@ -86,13 +86,13 @@ h1 {
 
 .github-link {
     position: absolute;
-    top: 0;
+    top: 1px;
     right: 0;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 30px;
-    height: 30px;
+    width: 22px;
+    height: 22px;
     overflow: hidden;
     gap: 0;
     padding: 0;
@@ -111,7 +111,8 @@ h1 {
     opacity: 0;
     overflow: hidden;
     transform: translateX(-2px);
-    font-size: 0.57rem;
+    font-size: 0.53rem;
+    line-height: 1;
     font-weight: 700;
     letter-spacing: 0.01em;
     white-space: nowrap;
@@ -124,8 +125,8 @@ h1 {
 .github-link.has-update {
     width: auto;
     justify-content: flex-start;
-    gap: 6px;
-    padding: 0 10px 0 8px;
+    gap: 4px;
+    padding: 0 8px 0 6px;
     border-color: #ffb340;
     background: #fff5e5;
     color: #9a5600;
@@ -151,8 +152,8 @@ h1 {
 }
 
 .github-link svg {
-    width: 16px;
-    height: 16px;
+    width: 12px;
+    height: 12px;
     fill: currentColor;
 }
 

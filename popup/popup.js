@@ -11,7 +11,6 @@ const GITHUB_LATEST_RELEASE_URL =
   "https://api.github.com/repos/webjocke/bluemine/releases/latest";
 const LATEST_RELEASE_CACHE_KEY = "cache.githubLatestRelease";
 const RELEASE_LAST_SEEN_TAG_KEY = "release.lastSeenTag";
-const LATEST_RELEASE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 const gitlabMrToggle = document.getElementById("gitlab-mr-toggle");
 const restoreScrollOnReloadToggle = document.getElementById(
@@ -83,15 +82,6 @@ function setLocalStorage(values) {
   });
 }
 
-function hasFreshReleaseCache(cacheEntry) {
-  const fetchedAt = Number(cacheEntry && cacheEntry.fetchedAt);
-  if (!Number.isFinite(fetchedAt) || fetchedAt <= 0) {
-    return false;
-  }
-
-  return Date.now() - fetchedAt < LATEST_RELEASE_CACHE_TTL_MS;
-}
-
 async function fetchLatestReleaseData() {
   const response = await fetch(GITHUB_LATEST_RELEASE_URL, {
     headers: { Accept: "application/vnd.github+json" },
@@ -158,11 +148,6 @@ async function loadLatestReleaseInfo() {
     cachedRelease && typeof cachedRelease.releaseUrl === "string"
       ? cachedRelease.releaseUrl.trim()
       : "";
-
-  if (cachedTagName && hasFreshReleaseCache(cachedRelease)) {
-    await syncReleaseLinkState(cachedTagName, cachedReleaseUrl, lastSeenTag);
-    return;
-  }
 
   try {
     const latestRelease = await fetchLatestReleaseData();
