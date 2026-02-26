@@ -1778,15 +1778,6 @@ async function runGitlabMrStatusFeature() {
   }
 }
 
-// Auto-refresh page when user navigates back to agile board
-if (isAgileBoardPage()) {
-  window.addEventListener("pageshow", (event) => {
-    if (event.persisted) {
-      window.location.reload();
-    }
-  });
-}
-
 chrome.storage.sync.get(
   {
     [FEATURE_KEY]: false,
@@ -1794,6 +1785,17 @@ chrome.storage.sync.get(
     [RESTORE_SCROLL_ON_RELOAD_FEATURE_KEY]: false,
   },
   async (result) => {
+    // When the browser restores this page from the back-forward cache (BFCache),
+    // content scripts do not re-run. Force a reload so the board fetches fresh
+    // data, exactly as if the user had navigated here normally.
+    if (result[RESTORE_SCROLL_ON_RELOAD_FEATURE_KEY] && isAgileBoardPage()) {
+      window.addEventListener("pageshow", (event) => {
+        if (event.persisted) {
+          window.location.reload();
+        }
+      });
+    }
+
     const matchesDetectedRedmineHeaders = await isDetectedRedmineTab();
     if (!matchesDetectedRedmineHeaders) {
       if (result[RESTORE_SCROLL_ON_RELOAD_FEATURE_KEY] && isAgileBoardPage()) {
