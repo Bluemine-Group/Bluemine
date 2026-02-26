@@ -1778,6 +1778,15 @@ async function runGitlabMrStatusFeature() {
   }
 }
 
+// Auto-refresh page when user navigates back to agile board
+if (isAgileBoardPage()) {
+  window.addEventListener("pageshow", (event) => {
+    if (event.persisted) {
+      window.location.reload();
+    }
+  });
+}
+
 chrome.storage.sync.get(
   {
     [FEATURE_KEY]: false,
