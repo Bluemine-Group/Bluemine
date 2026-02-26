@@ -1,4 +1,3 @@
-const FEATURE_KEY = "feature.helloWorld.enabled";
 const GITLAB_MR_FEATURE_KEY = "feature.gitlabMrStatus.enabled";
 const RESTORE_SCROLL_ON_RELOAD_FEATURE_KEY =
   "feature.restoreScrollOnReload.enabled";
@@ -45,10 +44,6 @@ function isDetectedRedmineTab() {
       },
     );
   });
-}
-
-function runHelloWorldFeature() {
-  console.info("[Bluemine] Hello World!");
 }
 
 function getCurrentBoardProjectName() {
@@ -1780,7 +1775,6 @@ async function runGitlabMrStatusFeature() {
 
 chrome.storage.sync.get(
   {
-    [FEATURE_KEY]: false,
     [GITLAB_MR_FEATURE_KEY]: false,
     [RESTORE_SCROLL_ON_RELOAD_FEATURE_KEY]: false,
   },
@@ -1804,10 +1798,6 @@ chrome.storage.sync.get(
         removeScrollRestoreOverlayIfReady();
       }
       return;
-    }
-
-    if (result[FEATURE_KEY]) {
-      runHelloWorldFeature();
     }
 
     const hasVisibleScrollRestoreOverlay = Boolean(
