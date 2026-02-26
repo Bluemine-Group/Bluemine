@@ -1,4 +1,3 @@
-const FEATURE_KEY = "feature.helloWorld.enabled";
 const GITLAB_MR_FEATURE_KEY = "feature.gitlabMrStatus.enabled";
 const ENHANCED_AGILE_BOARD_FEATURE_KEY = "feature.restoreScrollOnReload.enabled";
 const BOARD_PATH_REGEX = /\/projects\/([^/]+)\/agile\/board\/?$/;
@@ -48,10 +47,6 @@ function isDetectedRedmineTab() {
       },
     );
   });
-}
-
-function runHelloWorldFeature() {
-  console.info("[Bluemine] Hello World!");
 }
 
 function getCurrentBoardProjectName() {
@@ -2045,7 +2040,6 @@ async function runGitlabMrStatusFeature() {
 
 chrome.storage.sync.get(
   {
-    [FEATURE_KEY]: false,
     [GITLAB_MR_FEATURE_KEY]: false,
     [ENHANCED_AGILE_BOARD_FEATURE_KEY]: false,
   },
@@ -2069,10 +2063,6 @@ chrome.storage.sync.get(
       return;
     }
 
-    if (result[FEATURE_KEY]) {
-      runHelloWorldFeature();
-    }
-
     const hasVisibleScrollRestoreOverlay = Boolean(
       document.getElementById(SCROLL_RESTORE_OVERLAY_ID),
     );
@@ -2083,8 +2073,8 @@ chrome.storage.sync.get(
     }
 
     if (result[ENHANCED_AGILE_BOARD_FEATURE_KEY]) {
-      runRestoreScrollOnReloadFeature();
       runCollapsedGroupsFeature();
+      runRestoreScrollOnReloadFeature();
     } else {
       removeScrollRestoreOverlayIfReady();
     }

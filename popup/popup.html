@@ -10,6 +10,7 @@
         <main class="popup">
             <header class="hero">
                 <a
+                    id="github-link"
                     class="github-link"
                     href="https://github.com/webjocke/Bluemine"
                     target="_blank"
@@ -26,16 +27,28 @@
                             d="M12 1.5a10.5 10.5 0 0 0-3.32 20.46c.53.1.73-.23.73-.52v-1.9c-2.97.65-3.6-1.43-3.6-1.43-.49-1.24-1.19-1.57-1.19-1.57-.97-.66.07-.65.07-.65 1.08.08 1.64 1.11 1.64 1.11.95 1.64 2.5 1.17 3.11.89.1-.69.38-1.17.68-1.44-2.37-.27-4.87-1.18-4.87-5.27 0-1.16.41-2.11 1.1-2.85-.11-.27-.48-1.37.1-2.86 0 0 .9-.29 2.94 1.09a10.16 10.16 0 0 1 5.36 0c2.04-1.38 2.94-1.09 2.94-1.09.58 1.49.21 2.59.1 2.86.69.74 1.1 1.69 1.1 2.85 0 4.1-2.5 5-4.88 5.27.39.34.74 1.02.74 2.06v3.05c0 .29.19.63.74.52A10.5 10.5 0 0 0 12 1.5Z"
                         ></path>
                     </svg>
+                    <span class="github-link-label" aria-hidden="true"
+                        >New version available</span
+                    >
                 </a>
-                <p class="eyebrow">Bluemine</p>
-                <h1>Opt-in features</h1>
-                <p class="subtitle">Extension preferences</p>
+                <div class="hero-identity">
+                    <img
+                        src="../icons/icon48.png"
+                        class="hero-icon"
+                        alt="Bluemine"
+                        aria-hidden="true"
+                    />
+                    <div class="hero-text">
+                        <h1>Bluemine</h1>
+                        <p class="subtitle">Extension preferences</p>
+                    </div>
+                </div>
             </header>
 
             <section class="glass-group">
                 <label class="setting-row toggle-row" for="gitlab-mr-toggle">
                     <span class="row-copy">
-                        <span class="setting-title">GitLab MR status</span>
+                        <span class="setting-title">GitLab Integration</span>
                         <span class="setting-subtitle"
                             >Show merge-request status on Agile board cards and
                             stories</span
@@ -124,22 +137,6 @@
                             id="restore-scroll-on-reload-toggle"
                             type="checkbox"
                         />
-                        <span class="switch-ui" aria-hidden="true"></span>
-                    </span>
-                </label>
-            </section>
-
-            <section class="glass-group">
-                <label class="setting-row toggle-row" for="hello-world-toggle">
-                    <span class="row-copy">
-                        <span class="setting-title">Console hello world</span>
-                        <span class="setting-subtitle"
-                            >Print a debug message in the browser console on
-                            page load</span
-                        >
-                    </span>
-                    <span class="switch-shell">
-                        <input id="hello-world-toggle" type="checkbox" />
                         <span class="switch-ui" aria-hidden="true"></span>
                     </span>
                 </label>

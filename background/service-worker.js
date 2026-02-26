@@ -1,5 +1,43 @@
-chrome.runtime.onInstalled.addListener(() => {
-  console.log("[Bluemine] Extension installed");
+const RELEASE_LAST_SEEN_TAG_KEY = "release.lastSeenTag";
+const EXTENSION_LIFECYCLE_META_KEY = "meta.extensionLifecycle";
+
+chrome.runtime.onInstalled.addListener((details) => {
+  const installedAt = Date.now();
+
+  chrome.storage.local.get({ [EXTENSION_LIFECYCLE_META_KEY]: {} }, (result) => {
+    const previousMeta =
+      result &&
+      result[EXTENSION_LIFECYCLE_META_KEY] &&
+      typeof result[EXTENSION_LIFECYCLE_META_KEY] === "object"
+        ? result[EXTENSION_LIFECYCLE_META_KEY]
+        : {};
+    const previousInstallEpoch = Number(previousMeta.installEpoch);
+    const nextMeta = {
+      installEpoch:
+        Number.isFinite(previousInstallEpoch) && previousInstallEpoch > 0
+          ? previousInstallEpoch
+          : installedAt,
+      lastEventReason: String(details?.reason || "install"),
+      lastEventEpoch: installedAt
+    };
+
+    if (details?.reason === "install") {
+      nextMeta.installEpoch = installedAt;
+      nextMeta.previousVersion = "";
+    }
+
+    if (details?.reason === "update") {
+      nextMeta.lastUpdateEpoch = installedAt;
+      nextMeta.previousVersion = String(details?.previousVersion || "").trim();
+    }
+
+    chrome.storage.local.set({
+      [EXTENSION_LIFECYCLE_META_KEY]: nextMeta,
+      [RELEASE_LAST_SEEN_TAG_KEY]: ""
+    });
+
+    console.log(`[Bluemine] Extension ${nextMeta.lastEventReason}`);
+  });
 });
 
 const GITLAB_BASE_URL_KEY = "settings.gitlabBaseUrl";

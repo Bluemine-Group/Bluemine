@@ -13,9 +13,11 @@ Our first theme target is a dark blue mode for better low-light usability.
 
 ### Current feature(s)
 
-- Hello World Improvement (sample opt-in feature toggle)
-- GitLab MR status on Agile board cards/stories (auto-runs when mapped project + GitLab settings exist)
-- Restore Agile board scroll position when reloading the same board page
+- GitLab Integration: show merge-request status on Agile board cards and stories
+- Enhanced Agile board:
+  - Restore scroll position when reloading the board
+  - Auto-reload when navigating back to the board (bypasses browser cache)
+  - Remember collapsed/expanded swimlane row state across reloads
 
 ### Coming soon
 

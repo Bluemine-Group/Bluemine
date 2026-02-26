@@ -1,11 +1,16 @@
-const FEATURE_KEY = "feature.helloWorld.enabled";
 const GITLAB_MR_FEATURE_KEY = "feature.gitlabMrStatus.enabled";
 const ENHANCED_AGILE_BOARD_FEATURE_KEY = "feature.restoreScrollOnReload.enabled";
 const GITLAB_BASE_URL_KEY = "settings.gitlabBaseUrl";
 const GITLAB_API_KEY_KEY = "settings.gitlabApiKey";
 const GITLAB_PROJECT_MAP_KEY = "settings.gitlabProjectMap";
+const GITHUB_REPO_URL = "https://github.com/webjocke/Bluemine";
+const GITHUB_RELEASES_URL = `${GITHUB_REPO_URL}/releases`;
+const GITHUB_LATEST_RELEASE_URL =
+  "https://api.github.com/repos/webjocke/bluemine/releases/latest";
+const LATEST_RELEASE_CACHE_KEY = "cache.githubLatestRelease";
+const RELEASE_LAST_SEEN_TAG_KEY = "release.lastSeenTag";
+const LATEST_RELEASE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
-const toggle = document.getElementById("hello-world-toggle");
 const gitlabMrToggle = document.getElementById("gitlab-mr-toggle");
 const restoreScrollOnReloadToggle = document.getElementById(
   "restore-scroll-on-reload-toggle",
@@ -14,8 +19,11 @@ const gitlabMrSettings = document.getElementById("gitlab-mr-settings");
 const gitlabUrlInput = document.getElementById("gitlab-url");
 const gitlabApiKeyInput = document.getElementById("gitlab-api-key");
 const projectMapInput = document.getElementById("project-map");
-const saveGitlabSettingsButton = document.getElementById("save-gitlab-settings");
+const saveGitlabSettingsButton = document.getElementById(
+  "save-gitlab-settings",
+);
 const status = document.getElementById("status");
+const githubLink = document.getElementById("github-link");
 
 function setStatus(message) {
   status.textContent = message;
@@ -26,6 +34,158 @@ function setStatus(message) {
   }, 1500);
 }
 
+function normalizeReleaseTag(rawTag) {
+  return String(rawTag || "")
+    .trim()
+    .toLowerCase();
+}
+
+function normalizeReleaseUrl(rawUrl) {
+  return String(rawUrl || "").trim();
+}
+
+function renderGithubLinkUpdateState(isUpdateAvailable, latestReleaseUrl) {
+  if (!githubLink) {
+    return;
+  }
+
+  const targetUrl = isUpdateAvailable
+    ? normalizeReleaseUrl(latestReleaseUrl) || GITHUB_RELEASES_URL
+    : GITHUB_REPO_URL;
+
+  githubLink.href = targetUrl;
+  githubLink.classList.toggle("has-update", isUpdateAvailable);
+  githubLink.setAttribute(
+    "title",
+    isUpdateAvailable
+      ? "Open latest Bluemine release"
+      : "Open Bluemine on GitHub",
+  );
+  githubLink.setAttribute(
+    "aria-label",
+    isUpdateAvailable
+      ? "Open latest Bluemine release"
+      : "Open Bluemine on GitHub",
+  );
+}
+
+function getLocalStorage(values) {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(values, resolve);
+  });
+}
+
+function setLocalStorage(values) {
+  return new Promise((resolve) => {
+    chrome.storage.local.set(values, resolve);
+  });
+}
+
+function hasFreshReleaseCache(cacheEntry) {
+  const fetchedAt = Number(cacheEntry && cacheEntry.fetchedAt);
+  if (!Number.isFinite(fetchedAt) || fetchedAt <= 0) {
+    return false;
+  }
+
+  return Date.now() - fetchedAt < LATEST_RELEASE_CACHE_TTL_MS;
+}
+
+async function fetchLatestReleaseData() {
+  const response = await fetch(GITHUB_LATEST_RELEASE_URL, {
+    headers: { Accept: "application/vnd.github+json" },
+  });
+  if (!response.ok) {
+    throw new Error(`GitHub API request failed (${response.status})`);
+  }
+
+  const releasePayload = await response.json();
+  const tagName = String(releasePayload.tag_name || "").trim();
+  if (!tagName) {
+    throw new Error("Missing tag_name in GitHub release payload");
+  }
+
+  const releaseUrl = normalizeReleaseUrl(releasePayload.html_url);
+  return {
+    tagName,
+    releaseUrl:
+      releaseUrl ||
+      `${GITHUB_REPO_URL}/releases/tag/${encodeURIComponent(tagName)}`,
+  };
+}
+
+async function syncReleaseLinkState(
+  latestTagName,
+  latestReleaseUrl,
+  lastSeenTag,
+) {
+  const normalizedLatestTag = normalizeReleaseTag(latestTagName);
+  const normalizedLastSeenTag = normalizeReleaseTag(lastSeenTag);
+
+  if (!normalizedLatestTag) {
+    renderGithubLinkUpdateState(false, "");
+    return normalizedLastSeenTag;
+  }
+
+  if (!normalizedLastSeenTag) {
+    await setLocalStorage({ [RELEASE_LAST_SEEN_TAG_KEY]: normalizedLatestTag });
+    renderGithubLinkUpdateState(false, latestReleaseUrl);
+    return normalizedLatestTag;
+  }
+
+  renderGithubLinkUpdateState(
+    normalizedLatestTag !== normalizedLastSeenTag,
+    latestReleaseUrl,
+  );
+  return normalizedLastSeenTag;
+}
+
+async function loadLatestReleaseInfo() {
+  renderGithubLinkUpdateState(false, "");
+
+  const localResult = await getLocalStorage({
+    [LATEST_RELEASE_CACHE_KEY]: null,
+    [RELEASE_LAST_SEEN_TAG_KEY]: "",
+  });
+  const cachedRelease = localResult[LATEST_RELEASE_CACHE_KEY];
+  const lastSeenTag = localResult[RELEASE_LAST_SEEN_TAG_KEY];
+  const cachedTagName =
+    cachedRelease && typeof cachedRelease.tagName === "string"
+      ? cachedRelease.tagName.trim()
+      : "";
+  const cachedReleaseUrl =
+    cachedRelease && typeof cachedRelease.releaseUrl === "string"
+      ? cachedRelease.releaseUrl.trim()
+      : "";
+
+  if (cachedTagName && hasFreshReleaseCache(cachedRelease)) {
+    await syncReleaseLinkState(cachedTagName, cachedReleaseUrl, lastSeenTag);
+    return;
+  }
+
+  try {
+    const latestRelease = await fetchLatestReleaseData();
+    await setLocalStorage({
+      [LATEST_RELEASE_CACHE_KEY]: {
+        tagName: latestRelease.tagName,
+        releaseUrl: latestRelease.releaseUrl,
+        fetchedAt: Date.now(),
+      },
+    });
+    await syncReleaseLinkState(
+      latestRelease.tagName,
+      latestRelease.releaseUrl,
+      lastSeenTag,
+    );
+  } catch (error) {
+    if (cachedTagName) {
+      await syncReleaseLinkState(cachedTagName, cachedReleaseUrl, lastSeenTag);
+    } else {
+      renderGithubLinkUpdateState(false, "");
+    }
+    console.warn("Unable to fetch latest Bluemine release tag", error);
+  }
+}
+
 function normalizeBaseUrl(raw) {
   const value = String(raw || "").trim();
   if (!value) {
@@ -33,7 +193,8 @@ function normalizeBaseUrl(raw) {
   }
 
   const parsed = new URL(value);
-  const path = parsed.pathname === "/" ? "" : parsed.pathname.replace(/\/+$/, "");
+  const path =
+    parsed.pathname === "/" ? "" : parsed.pathname.replace(/\/+$/, "");
   return `${parsed.origin}${path}`;
 }
 
@@ -66,7 +227,7 @@ function parseProjectMap(rawMap) {
 
   return {
     normalizedMap: validLines.join("\n"),
-    invalidLineCount
+    invalidLineCount,
   };
 }
 
@@ -89,15 +250,13 @@ function reloadActiveTab() {
 function readSettings() {
   chrome.storage.sync.get(
     {
-      [FEATURE_KEY]: false,
       [GITLAB_MR_FEATURE_KEY]: false,
       [ENHANCED_AGILE_BOARD_FEATURE_KEY]: false,
       [GITLAB_BASE_URL_KEY]: "",
       [GITLAB_API_KEY_KEY]: "",
-      [GITLAB_PROJECT_MAP_KEY]: ""
+      [GITLAB_PROJECT_MAP_KEY]: "",
     },
     (result) => {
-      toggle.checked = Boolean(result[FEATURE_KEY]);
       gitlabMrToggle.checked = Boolean(result[GITLAB_MR_FEATURE_KEY]);
       restoreScrollOnReloadToggle.checked = Boolean(
         result[ENHANCED_AGILE_BOARD_FEATURE_KEY],
@@ -106,23 +265,8 @@ function readSettings() {
       gitlabUrlInput.value = result[GITLAB_BASE_URL_KEY] || "";
       gitlabApiKeyInput.value = result[GITLAB_API_KEY_KEY] || "";
       projectMapInput.value = result[GITLAB_PROJECT_MAP_KEY] || "";
-    }
+    },
   );
-}
-
-function saveFeatureState(enabled) {
-  chrome.storage.sync.get({ [FEATURE_KEY]: false }, (result) => {
-    const previous = Boolean(result[FEATURE_KEY]);
-    if (previous === enabled) {
-      setStatus("No changes to save");
-      return;
-    }
-
-    chrome.storage.sync.set({ [FEATURE_KEY]: enabled }, () => {
-      setStatus("Saved");
-      reloadActiveTab();
-    });
-  });
 }
 
 function saveGitlabMrFeatureState(enabled) {
@@ -134,7 +278,9 @@ function saveGitlabMrFeatureState(enabled) {
     }
 
     chrome.storage.sync.set({ [GITLAB_MR_FEATURE_KEY]: enabled }, () => {
-      setStatus(enabled ? "GitLab MR status enabled" : "GitLab MR status disabled");
+      setStatus(
+        enabled ? "GitLab MR status enabled" : "GitLab MR status disabled",
+      );
       reloadActiveTab();
     });
   });
@@ -170,13 +316,15 @@ function saveGitlabSettings() {
     const rawUrl = String(gitlabUrlInput.value || "").trim();
     const normalizedGitlabUrl = rawUrl ? normalizeBaseUrl(rawUrl) : "";
     const apiKey = String(gitlabApiKeyInput.value || "").trim();
-    const { normalizedMap, invalidLineCount } = parseProjectMap(projectMapInput.value);
+    const { normalizedMap, invalidLineCount } = parseProjectMap(
+      projectMapInput.value,
+    );
 
     chrome.storage.sync.get(
       {
         [GITLAB_BASE_URL_KEY]: "",
         [GITLAB_API_KEY_KEY]: "",
-        [GITLAB_PROJECT_MAP_KEY]: ""
+        [GITLAB_PROJECT_MAP_KEY]: "",
       },
       (result) => {
         const previousUrl = String(result[GITLAB_BASE_URL_KEY] || "");
@@ -190,7 +338,9 @@ function saveGitlabSettings() {
 
         if (!hasChanges) {
           if (invalidLineCount > 0) {
-            setStatus(`No changes, ignored ${invalidLineCount} invalid line${invalidLineCount === 1 ? "" : "s"}`);
+            setStatus(
+              `No changes, ignored ${invalidLineCount} invalid line${invalidLineCount === 1 ? "" : "s"}`,
+            );
             return;
           }
           setStatus("No changes to save");
@@ -201,7 +351,7 @@ function saveGitlabSettings() {
           {
             [GITLAB_BASE_URL_KEY]: normalizedGitlabUrl,
             [GITLAB_API_KEY_KEY]: apiKey,
-            [GITLAB_PROJECT_MAP_KEY]: normalizedMap
+            [GITLAB_PROJECT_MAP_KEY]: normalizedMap,
           },
           () => {
             gitlabUrlInput.value = normalizedGitlabUrl;
@@ -209,25 +359,23 @@ function saveGitlabSettings() {
             projectMapInput.value = normalizedMap;
 
             if (invalidLineCount > 0) {
-              setStatus(`GitLab settings saved, ignored ${invalidLineCount} invalid line${invalidLineCount === 1 ? "" : "s"}`);
+              setStatus(
+                `GitLab settings saved, ignored ${invalidLineCount} invalid line${invalidLineCount === 1 ? "" : "s"}`,
+              );
               reloadActiveTab();
               return;
             }
 
             setStatus("GitLab settings saved");
             reloadActiveTab();
-          }
+          },
         );
-      }
+      },
     );
   } catch (_error) {
     setStatus("Invalid URL");
   }
 }
-
-toggle.addEventListener("change", (event) => {
-  saveFeatureState(event.target.checked);
-});
 
 gitlabMrToggle.addEventListener("change", (event) => {
   const enabled = Boolean(event.target.checked);
@@ -256,3 +404,4 @@ gitlabApiKeyInput.addEventListener("keydown", (event) => {
 });
 
 readSettings();
+loadLatestReleaseInfo();
