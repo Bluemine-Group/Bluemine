@@ -1,5 +1,8 @@
+/* global browserAPI */
+
 const GITLAB_MR_FEATURE_KEY = "feature.gitlabMrStatus.enabled";
-const ENHANCED_AGILE_BOARD_FEATURE_KEY = "feature.restoreScrollOnReload.enabled";
+const ENHANCED_AGILE_BOARD_FEATURE_KEY =
+  "feature.restoreScrollOnReload.enabled";
 const BOARD_PATH_REGEX = /\/projects\/([^/]+)\/agile\/board\/?$/;
 const SCROLL_RESTORE_STATE_KEY = "bluemine.scrollRestoreState.v1";
 const SCROLL_RESTORE_WAIT_TIMEOUT_MS = 20000;
@@ -31,22 +34,45 @@ let lastKnownWindowScrollY = 0;
 let shouldHoldScrollRestoreOverlayForScroll = false;
 let shouldHoldScrollRestoreOverlayForGitlab = false;
 
-function isDetectedRedmineTab() {
+function detectRedmineFromDOM() {
+  const hasRedmineMetaTag = Boolean(
+    document.querySelector(
+      'meta[name="csrf-param"][content="authenticity_token"]',
+    ),
+  );
+  const hasRedmineBody = Boolean(
+    document.querySelector("body.controller-agile_boards") ||
+    document.querySelector("body.controller-issues") ||
+    document.querySelector("body.controller-projects") ||
+    document.querySelector("body.controller-wiki") ||
+    document.querySelector("body.controller-timelog") ||
+    document.getElementById("main-menu"),
+  );
+  return hasRedmineMetaTag || hasRedmineBody;
+}
+
+function registerRedmineTabDetection() {
+  const isRedmine = detectRedmineFromDOM();
   return new Promise((resolve) => {
-    chrome.runtime.sendMessage(
+    browserAPI.runtime.sendMessage(
       {
-        type: "BLUEMINE_IS_REDMINE_TAB",
+        type: "BLUEMINE_REGISTER_REDMINE_TAB",
+        isRedmine,
       },
       (response) => {
-        if (chrome.runtime.lastError) {
-          resolve(false);
+        if (browserAPI.runtime.lastError) {
+          resolve(isRedmine);
           return;
         }
 
-        resolve(Boolean(response?.ok && response?.isRedmine));
+        resolve(Boolean(response?.ok) ? isRedmine : false);
       },
     );
   });
+}
+
+function isDetectedRedmineTab() {
+  return registerRedmineTabDetection();
 }
 
 function getCurrentBoardProjectName() {
@@ -437,33 +463,44 @@ function ensureSwimlaneToolbarStyles() {
     }
 
     #${SWIMLANE_TOOLBAR_ID} {
-      display: flex;
+      display: inline-flex;
       align-items: center;
       gap: 6px;
-      margin-bottom: 6px;
+      margin-left: auto;
     }
 
     #${SWIMLANE_TOOLBAR_ID} .bluemine-swimlane-btn {
-      height: 26px;
-      padding: 0 12px;
-      border: 1px solid #c7d2de;
-      border-radius: 3px;
-      background: #f4f7fa;
-      color: #3a3a3c;
+      display: inline-flex;
+      align-items: center;
+      gap: 0px;
+      padding: 0;
+      border: none;
+      background: none;
+      color: #269;
+      font: inherit;
       font-size: 11px;
-      font-weight: 600;
       cursor: pointer;
       line-height: 1;
+      white-space: nowrap;
     }
 
     #${SWIMLANE_TOOLBAR_ID} .bluemine-swimlane-btn:hover {
-      background: #e8eef5;
-      border-color: #a8b9cc;
+      text-decoration: underline;
     }
 
-    #${SWIMLANE_TOOLBAR_ID} .bluemine-swimlane-btn:active {
-      background: #dce6f0;
+    #${SWIMLANE_TOOLBAR_ID} .bluemine-swimlane-btn:hover svg {
+      color: #c61a1a;
     }
+
+    #${SWIMLANE_TOOLBAR_ID} .bluemine-swimlane-btn svg {
+      width: 18px;
+      height: 18px;
+      flex: 0 0 auto;
+      color: #888;
+      position: relative;
+      top: 1px;
+    }
+
   `;
   (document.head || document.documentElement).appendChild(style);
 }
@@ -475,29 +512,59 @@ function findBoardTable() {
   return groupRow ? groupRow.closest("table") : null;
 }
 
+function findRedmineToolbar() {
+  const queryButtons =
+    document.querySelector("#query_form_with_buttons .buttons") ||
+    document.querySelector("#query_form .buttons") ||
+    document.querySelector(".query-buttons") ||
+    document.querySelector("p.buttons");
+  return queryButtons;
+}
+
 function injectSwimlaneToolbar(onCollapseAll, onExpandAll) {
   if (document.getElementById(SWIMLANE_TOOLBAR_ID)) return;
-  const boardTable = findBoardTable();
-  if (!boardTable || !boardTable.parentNode) return;
 
-  const toolbar = document.createElement("div");
+  const toolbar = document.createElement("span");
   toolbar.id = SWIMLANE_TOOLBAR_ID;
+
+  const collapseSvg =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 20 5-5 5 5"/><path d="m7 4 5 5 5-5"/></svg>';
+  const expandSvg =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></svg>';
 
   const collapseBtn = document.createElement("button");
   collapseBtn.type = "button";
   collapseBtn.className = "bluemine-swimlane-btn";
-  collapseBtn.textContent = "Collapse all";
+  collapseBtn.innerHTML =
+    collapseSvg + '<span class="icon-label">Collapse all</span>';
   collapseBtn.addEventListener("click", onCollapseAll);
 
   const expandBtn = document.createElement("button");
   expandBtn.type = "button";
   expandBtn.className = "bluemine-swimlane-btn";
-  expandBtn.textContent = "Expand all";
+  expandBtn.innerHTML =
+    expandSvg + '<span class="icon-label">Expand all</span>';
   expandBtn.addEventListener("click", onExpandAll);
 
   toolbar.appendChild(collapseBtn);
   toolbar.appendChild(expandBtn);
-  boardTable.parentNode.insertBefore(toolbar, boardTable);
+
+  const redmineToolbar = findRedmineToolbar();
+  if (redmineToolbar) {
+    redmineToolbar.style.display = "flex";
+    redmineToolbar.style.alignItems = "center";
+    redmineToolbar.style.flexWrap = "wrap";
+    redmineToolbar.appendChild(toolbar);
+    return;
+  }
+
+  const boardTable = findBoardTable();
+  if (boardTable && boardTable.parentNode) {
+    toolbar.style.display = "flex";
+    toolbar.style.justifyContent = "flex-end";
+    toolbar.style.marginBottom = "6px";
+    boardTable.parentNode.insertBefore(toolbar, boardTable);
+  }
 }
 
 function getSiblingIssueRow(groupRow) {
@@ -530,10 +597,7 @@ function swapExpanderIcon(expander, href) {
     const base = current.split("#")[0];
     use.setAttribute("href", `${base}#${href}`);
   } else if (use.hasAttribute("xlink:href")) {
-    const current = use.getAttributeNS(
-      "http://www.w3.org/1999/xlink",
-      "href",
-    );
+    const current = use.getAttributeNS("http://www.w3.org/1999/xlink", "href");
     const base = current.split("#")[0];
     use.setAttributeNS(
       "http://www.w3.org/1999/xlink",
@@ -567,6 +631,15 @@ function expandGroupRow(row) {
   }
   const issueRow = getSiblingIssueRow(row);
   if (issueRow) issueRow.style.display = "";
+}
+
+function ensureBoardScrollbarVisible() {
+  const id = "bluemine-board-scrollbar-style";
+  if (document.getElementById(id)) return;
+  const style = document.createElement("style");
+  style.id = id;
+  style.textContent = "html { overflow-y: scroll !important; }";
+  (document.head || document.documentElement).appendChild(style);
 }
 
 function runCollapsedGroupsFeature() {
@@ -1636,7 +1709,7 @@ function fetchGitlabMergeRequests(
   const cacheOnly = Boolean(options.cacheOnly);
   const boardCacheKey = String(options.boardCacheKey || "").trim();
   return new Promise((resolve, reject) => {
-    chrome.runtime.sendMessage(
+    browserAPI.runtime.sendMessage(
       {
         type: "BLUEMINE_FETCH_GITLAB_MRS",
         redmineProjectName,
@@ -1645,8 +1718,8 @@ function fetchGitlabMergeRequests(
         boardCacheKey,
       },
       (response) => {
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
+        if (browserAPI.runtime.lastError) {
+          reject(new Error(browserAPI.runtime.lastError.message));
           return;
         }
 
@@ -1673,13 +1746,13 @@ function fetchGitlabMergeRequests(
 
 function isGitlabProjectReady(redmineProjectName) {
   return new Promise((resolve) => {
-    chrome.runtime.sendMessage(
+    browserAPI.runtime.sendMessage(
       {
         type: "BLUEMINE_IS_GITLAB_PROJECT_READY",
         redmineProjectName,
       },
       (response) => {
-        if (chrome.runtime.lastError) {
+        if (browserAPI.runtime.lastError) {
           resolve(false);
           return;
         }
@@ -1721,7 +1794,7 @@ function fetchGitlabAssigneeAvatars(
 ) {
   const cacheOnly = Boolean(options.cacheOnly);
   return new Promise((resolve, reject) => {
-    chrome.runtime.sendMessage(
+    browserAPI.runtime.sendMessage(
       {
         type: "BLUEMINE_FETCH_GITLAB_ASSIGNEE_AVATARS",
         redmineProjectName,
@@ -1729,8 +1802,8 @@ function fetchGitlabAssigneeAvatars(
         cacheOnly,
       },
       (response) => {
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
+        if (browserAPI.runtime.lastError) {
+          reject(new Error(browserAPI.runtime.lastError.message));
           return;
         }
 
@@ -2038,7 +2111,7 @@ async function runGitlabMrStatusFeature() {
   }
 }
 
-chrome.storage.sync.get(
+browserAPI.storage.local.get(
   {
     [GITLAB_MR_FEATURE_KEY]: false,
     [ENHANCED_AGILE_BOARD_FEATURE_KEY]: false,
@@ -2055,6 +2128,7 @@ chrome.storage.sync.get(
     const matchesDetectedRedmineHeaders = await isDetectedRedmineTab();
     if (!matchesDetectedRedmineHeaders) {
       if (result[ENHANCED_AGILE_BOARD_FEATURE_KEY] && isAgileBoardPage()) {
+        ensureBoardScrollbarVisible();
         runRestoreScrollOnReloadFeature();
         runCollapsedGroupsFeature();
       } else {
@@ -2073,6 +2147,7 @@ chrome.storage.sync.get(
     }
 
     if (result[ENHANCED_AGILE_BOARD_FEATURE_KEY]) {
+      if (isAgileBoardPage()) ensureBoardScrollbarVisible();
       runCollapsedGroupsFeature();
       runRestoreScrollOnReloadFeature();
     } else {

@@ -106,6 +106,7 @@
                     </div>
 
                     <div class="actions">
+                        <span id="status" class="status" aria-live="polite" role="status"></span>
                         <button
                             id="save-gitlab-settings"
                             type="button"
@@ -143,10 +144,9 @@
                     </span>
                 </label>
             </section>
-
-            <p id="status" class="status" aria-live="polite" role="status"></p>
         </main>
 
+        <script src="../lib/browser-polyfill.js"></script>
         <script src="popup.js"></script>
     </body>
 </html>

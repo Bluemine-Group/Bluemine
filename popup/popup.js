@@ -1,3 +1,5 @@
+/* global browserAPI */
+
 const GITLAB_MR_FEATURE_KEY = "feature.gitlabMrStatus.enabled";
 const ENHANCED_AGILE_BOARD_FEATURE_KEY = "feature.restoreScrollOnReload.enabled";
 const GITLAB_BASE_URL_KEY = "settings.gitlabBaseUrl";
@@ -71,13 +73,13 @@ function renderGithubLinkUpdateState(isUpdateAvailable, latestReleaseUrl) {
 
 function getLocalStorage(values) {
   return new Promise((resolve) => {
-    chrome.storage.local.get(values, resolve);
+    browserAPI.storage.local.get(values, resolve);
   });
 }
 
 function setLocalStorage(values) {
   return new Promise((resolve) => {
-    chrome.storage.local.set(values, resolve);
+    browserAPI.storage.local.set(values, resolve);
   });
 }
 
@@ -237,18 +239,18 @@ function setGitlabSettingsVisible(isVisible) {
 }
 
 function reloadActiveTab() {
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+  browserAPI.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     const activeTab = tabs && tabs[0];
     if (!activeTab || typeof activeTab.id !== "number") {
       return;
     }
 
-    chrome.tabs.reload(activeTab.id);
+    browserAPI.tabs.reload(activeTab.id);
   });
 }
 
 function readSettings() {
-  chrome.storage.sync.get(
+  browserAPI.storage.local.get(
     {
       [GITLAB_MR_FEATURE_KEY]: false,
       [ENHANCED_AGILE_BOARD_FEATURE_KEY]: false,
@@ -270,18 +272,18 @@ function readSettings() {
 }
 
 function saveGitlabMrFeatureState(enabled) {
-  chrome.storage.sync.get({ [GITLAB_MR_FEATURE_KEY]: false }, (result) => {
+  browserAPI.storage.local.get({ [GITLAB_MR_FEATURE_KEY]: false }, (result) => {
     const previous = Boolean(result[GITLAB_MR_FEATURE_KEY]);
     if (previous === enabled) {
       return;
     }
 
-    chrome.storage.sync.set({ [GITLAB_MR_FEATURE_KEY]: enabled });
+    browserAPI.storage.local.set({ [GITLAB_MR_FEATURE_KEY]: enabled });
   });
 }
 
 function saveRestoreScrollOnReloadState(enabled) {
-  chrome.storage.sync.get(
+  browserAPI.storage.local.get(
     { [ENHANCED_AGILE_BOARD_FEATURE_KEY]: false },
     (result) => {
       const previous = Boolean(result[ENHANCED_AGILE_BOARD_FEATURE_KEY]);
@@ -289,7 +291,7 @@ function saveRestoreScrollOnReloadState(enabled) {
         return;
       }
 
-      chrome.storage.sync.set({ [ENHANCED_AGILE_BOARD_FEATURE_KEY]: enabled });
+      browserAPI.storage.local.set({ [ENHANCED_AGILE_BOARD_FEATURE_KEY]: enabled });
     },
   );
 }
@@ -303,7 +305,7 @@ function saveGitlabSettings() {
       projectMapInput.value,
     );
 
-    chrome.storage.sync.get(
+    browserAPI.storage.local.get(
       {
         [GITLAB_BASE_URL_KEY]: "",
         [GITLAB_API_KEY_KEY]: "",
@@ -330,7 +332,7 @@ function saveGitlabSettings() {
           return;
         }
 
-        chrome.storage.sync.set(
+        browserAPI.storage.local.set(
           {
             [GITLAB_BASE_URL_KEY]: normalizedGitlabUrl,
             [GITLAB_API_KEY_KEY]: apiKey,

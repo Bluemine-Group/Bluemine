@@ -1,10 +1,14 @@
+if (typeof importScripts === "function" && typeof browserAPI === "undefined") {
+  importScripts("../lib/browser-polyfill.js");
+}
+
 const RELEASE_LAST_SEEN_TAG_KEY = "release.lastSeenTag";
 const EXTENSION_LIFECYCLE_META_KEY = "meta.extensionLifecycle";
 
-chrome.runtime.onInstalled.addListener((details) => {
+browserAPI.runtime.onInstalled.addListener((details) => {
   const installedAt = Date.now();
 
-  chrome.storage.local.get({ [EXTENSION_LIFECYCLE_META_KEY]: {} }, (result) => {
+  browserAPI.storage.local.get({ [EXTENSION_LIFECYCLE_META_KEY]: {} }, (result) => {
     const previousMeta =
       result &&
       result[EXTENSION_LIFECYCLE_META_KEY] &&
@@ -31,7 +35,7 @@ chrome.runtime.onInstalled.addListener((details) => {
       nextMeta.previousVersion = String(details?.previousVersion || "").trim();
     }
 
-    chrome.storage.local.set({
+    browserAPI.storage.local.set({
       [EXTENSION_LIFECYCLE_META_KEY]: nextMeta,
       [RELEASE_LAST_SEEN_TAG_KEY]: ""
     });
@@ -49,7 +53,6 @@ const GITLAB_AVATAR_CACHE_KEY = "cache.gitlabAssigneeAvatars.v1";
 const GITLAB_ASSIGNEE_NAME_CACHE_KEY = "cache.gitlabAssigneeNameAvatars.v1";
 const GITLAB_AVATAR_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const MR_TITLE_PREFIX_REGEX = /^(\d{5}(?:\s*[^\d\s]\s*\d{5})*) - /;
-const REDMINE_SESSION_COOKIE_NAME = "_redmine_session=";
 const redmineTabDetection = new Map();
 
 function createGitlabRequestMetrics() {
@@ -76,88 +79,22 @@ function buildGitlabRequestMetrics(metrics) {
   };
 }
 
-function hasRedmineSessionSetCookie(responseHeaders) {
-  if (!Array.isArray(responseHeaders)) {
-    return false;
-  }
-
-  return responseHeaders.some((header) => {
-    const headerName = String(header?.name || "").toLowerCase();
-    if (headerName !== "set-cookie") {
-      return false;
-    }
-
-    const headerValue = String(header?.value || "");
-    return headerValue.includes(REDMINE_SESSION_COOKIE_NAME);
-  });
-}
-
-function hasRedmineSessionCookieRequestHeader(requestHeaders) {
-  if (!Array.isArray(requestHeaders)) {
-    return false;
-  }
-
-  return requestHeaders.some((header) => {
-    const headerName = String(header?.name || "").toLowerCase();
-    if (headerName !== "cookie") {
-      return false;
-    }
-
-    const headerValue = String(header?.value || "");
-    return headerValue.includes(REDMINE_SESSION_COOKIE_NAME);
-  });
-}
-
-chrome.webRequest.onBeforeSendHeaders.addListener(
-  (details) => {
-    if (details.tabId < 0 || details.type !== "main_frame") {
-      return;
-    }
-
-    redmineTabDetection.set(
-      details.tabId,
-      hasRedmineSessionCookieRequestHeader(details.requestHeaders),
-    );
-  },
-  {
-    urls: ["https://*/*", "http://*/*"],
-    types: ["main_frame"],
-  },
-  ["requestHeaders", "extraHeaders"],
-);
-
-chrome.webRequest.onHeadersReceived.addListener(
-  (details) => {
-    if (details.tabId < 0 || details.type !== "main_frame") {
-      return;
-    }
-
-    const detectedFromRequestCookies = Boolean(
-      redmineTabDetection.get(details.tabId),
-    );
-    const detectedFromSetCookie = hasRedmineSessionSetCookie(
-      details.responseHeaders,
-    );
-
-    redmineTabDetection.set(
-      details.tabId,
-      detectedFromRequestCookies || detectedFromSetCookie,
-    );
-  },
-  {
-    urls: ["https://*/*", "http://*/*"],
-    types: ["main_frame"],
-  },
-  ["responseHeaders", "extraHeaders"],
-);
-
-chrome.tabs.onRemoved.addListener((tabId) => {
+browserAPI.tabs.onRemoved.addListener((tabId) => {
   redmineTabDetection.delete(tabId);
 });
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+browserAPI.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === "BLUEMINE_PING") {
     sendResponse({ ok: true, source: "background" });
+    return;
+  }
+
+  if (message?.type === "BLUEMINE_REGISTER_REDMINE_TAB") {
+    const tabId = Number(_sender?.tab?.id);
+    if (Number.isInteger(tabId) && tabId >= 0) {
+      redmineTabDetection.set(tabId, Boolean(message.isRedmine));
+    }
+    sendResponse({ ok: true });
     return;
   }
 
@@ -294,21 +231,21 @@ function parseProjectMap(rawMap) {
   return map;
 }
 
-function getSyncSettings(defaults) {
+function getSettings(defaults) {
   return new Promise((resolve) => {
-    chrome.storage.sync.get(defaults, (result) => resolve(result));
+    browserAPI.storage.local.get(defaults, (result) => resolve(result));
   });
 }
 
 function getLocalSettings(defaults) {
   return new Promise((resolve) => {
-    chrome.storage.local.get(defaults, (result) => resolve(result));
+    browserAPI.storage.local.get(defaults, (result) => resolve(result));
   });
 }
 
 function setLocalSettings(values) {
   return new Promise((resolve) => {
-    chrome.storage.local.set(values, () => resolve());
+    browserAPI.storage.local.set(values, () => resolve());
   });
 }
 
@@ -325,7 +262,7 @@ function normalizeGitlabBaseUrl(gitlabBaseUrl) {
 }
 
 async function getGitlabProjectSettings(redmineProjectName) {
-  const settings = await getSyncSettings({
+  const settings = await getSettings({
     [GITLAB_MR_FEATURE_KEY]: false,
     [GITLAB_BASE_URL_KEY]: "",
     [GITLAB_API_KEY_KEY]: "",

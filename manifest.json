@@ -9,7 +9,7 @@
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
-  "permissions": ["storage", "activeTab", "webRequest"],
+  "permissions": ["storage", "activeTab"],
   "host_permissions": ["https://*/*", "http://*/*"],
   "action": {
     "default_title": "Bluemine Settings",
@@ -21,7 +21,8 @@
     "default_popup": "popup/popup.html"
   },
   "background": {
-    "service_worker": "background/service-worker.js"
+    "service_worker": "background/service-worker.js",
+    "scripts": ["lib/browser-polyfill.js", "background/service-worker.js"]
   },
   "content_scripts": [
     {
@@ -29,13 +30,22 @@
         "https://*/projects/*/agile/board*",
         "http://*/projects/*/agile/board*"
       ],
-      "js": ["content/scroll-restore-overlay.js"],
+      "js": ["lib/browser-polyfill.js", "content/scroll-restore-overlay.js"],
       "run_at": "document_start"
     },
     {
       "matches": ["https://*/*", "http://*/*"],
-      "js": ["content/content.js"],
+      "js": ["lib/browser-polyfill.js", "content/content.js"],
       "run_at": "document_idle"
     }
-  ]
+  ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "bluemine@bluemine.extension",
+      "strict_min_version": "121.0",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
+    }
+  }
 }

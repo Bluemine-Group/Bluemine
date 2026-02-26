@@ -1,3 +1,5 @@
+/* global browserAPI */
+
 (() => {
   const BOARD_PATH_REGEX = /\/projects\/([^/]+)\/agile\/board\/?$/;
   const SCROLL_RESTORE_STATE_KEY = "bluemine.scrollRestoreState.v1";
@@ -112,7 +114,7 @@
     return;
   }
 
-  chrome.storage.sync.get({ [GITLAB_MR_FEATURE_KEY]: false }, (result) => {
+  browserAPI.storage.local.get({ [GITLAB_MR_FEATURE_KEY]: false }, (result) => {
     const latestPageUrl = normalizePageUrl(window.location.href);
     const isStillEligibleBoardPage = isAgileBoardPage() &&
       latestPageUrl &&
