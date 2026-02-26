@@ -1,7 +1,6 @@
 const FEATURE_KEY = "feature.helloWorld.enabled";
 const GITLAB_MR_FEATURE_KEY = "feature.gitlabMrStatus.enabled";
-const RESTORE_SCROLL_ON_RELOAD_FEATURE_KEY =
-  "feature.restoreScrollOnReload.enabled";
+const ENHANCED_AGILE_BOARD_FEATURE_KEY = "feature.restoreScrollOnReload.enabled";
 const GITLAB_BASE_URL_KEY = "settings.gitlabBaseUrl";
 const GITLAB_API_KEY_KEY = "settings.gitlabApiKey";
 const GITLAB_PROJECT_MAP_KEY = "settings.gitlabProjectMap";
@@ -92,7 +91,7 @@ function readSettings() {
     {
       [FEATURE_KEY]: false,
       [GITLAB_MR_FEATURE_KEY]: false,
-      [RESTORE_SCROLL_ON_RELOAD_FEATURE_KEY]: false,
+      [ENHANCED_AGILE_BOARD_FEATURE_KEY]: false,
       [GITLAB_BASE_URL_KEY]: "",
       [GITLAB_API_KEY_KEY]: "",
       [GITLAB_PROJECT_MAP_KEY]: ""
@@ -101,7 +100,7 @@ function readSettings() {
       toggle.checked = Boolean(result[FEATURE_KEY]);
       gitlabMrToggle.checked = Boolean(result[GITLAB_MR_FEATURE_KEY]);
       restoreScrollOnReloadToggle.checked = Boolean(
-        result[RESTORE_SCROLL_ON_RELOAD_FEATURE_KEY],
+        result[ENHANCED_AGILE_BOARD_FEATURE_KEY],
       );
       setGitlabSettingsVisible(gitlabMrToggle.checked);
       gitlabUrlInput.value = result[GITLAB_BASE_URL_KEY] || "";
@@ -143,16 +142,16 @@ function saveGitlabMrFeatureState(enabled) {
 
 function saveRestoreScrollOnReloadState(enabled) {
   chrome.storage.sync.get(
-    { [RESTORE_SCROLL_ON_RELOAD_FEATURE_KEY]: false },
+    { [ENHANCED_AGILE_BOARD_FEATURE_KEY]: false },
     (result) => {
-      const previous = Boolean(result[RESTORE_SCROLL_ON_RELOAD_FEATURE_KEY]);
+      const previous = Boolean(result[ENHANCED_AGILE_BOARD_FEATURE_KEY]);
       if (previous === enabled) {
         setStatus("No changes to save");
         return;
       }
 
       chrome.storage.sync.set(
-        { [RESTORE_SCROLL_ON_RELOAD_FEATURE_KEY]: enabled },
+        { [ENHANCED_AGILE_BOARD_FEATURE_KEY]: enabled },
         () => {
           setStatus(
             enabled

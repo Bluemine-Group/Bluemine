@@ -1,7 +1,6 @@
 const FEATURE_KEY = "feature.helloWorld.enabled";
 const GITLAB_MR_FEATURE_KEY = "feature.gitlabMrStatus.enabled";
-const RESTORE_SCROLL_ON_RELOAD_FEATURE_KEY =
-  "feature.restoreScrollOnReload.enabled";
+const ENHANCED_AGILE_BOARD_FEATURE_KEY = "feature.restoreScrollOnReload.enabled";
 const BOARD_PATH_REGEX = /\/projects\/([^/]+)\/agile\/board\/?$/;
 const SCROLL_RESTORE_STATE_KEY = "bluemine.scrollRestoreState.v1";
 const SCROLL_RESTORE_WAIT_TIMEOUT_MS = 20000;
@@ -24,6 +23,10 @@ const MR_DETAIL_SIGNATURE_ATTRIBUTE = "data-bluemine-mr-detail-signature";
 const REDMINE_REVIEWER_NAME_ATTRIBUTE = "data-bluemine-redmine-reviewer-name";
 const GITLAB_ICON_PATH =
   "M22.547 13.374l-2.266-6.977a.783.783 0 0 0-.744-.53h-3.03L12 19.78 7.494 5.867H4.463a.783.783 0 0 0-.744.53l-2.266 6.977a1.523 1.523 0 0 0 .553 1.704L12 22.422l9.994-7.344a1.523 1.523 0 0 0 .553-1.704Z";
+const COLLAPSED_GROUPS_SESSION_KEY_PREFIX = "bluemine.collapsedGroups.v1.";
+const COLLAPSED_GROUP_NONE_ID = "__none__";
+const SWIMLANE_TOOLBAR_ID = "bluemine-swimlane-toolbar";
+const SWIMLANE_TOOLBAR_STYLE_ID = "bluemine-swimlane-toolbar-style";
 let hasRegisteredScrollTracker = false;
 let lastKnownWindowScrollY = 0;
 let shouldHoldScrollRestoreOverlayForScroll = false;
@@ -388,6 +391,268 @@ function runRestoreScrollOnReloadFeature() {
 
   setScrollRestoreOverlayHoldForScroll(true);
   restoreScrollPositionWhenReady(storedState.scrollY);
+}
+
+function readCollapsedGroupIds(storageKey) {
+  try {
+    const raw = window.sessionStorage.getItem(storageKey);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (id) =>
+        typeof id === "string" &&
+        (id === COLLAPSED_GROUP_NONE_ID || /^\d+$/.test(id)),
+    );
+  } catch (_error) {
+    return [];
+  }
+}
+
+function writeCollapsedGroupIds(storageKey, ids) {
+  try {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      window.sessionStorage.removeItem(storageKey);
+    } else {
+      window.sessionStorage.setItem(storageKey, JSON.stringify(ids));
+    }
+  } catch (_error) {
+    // Ignore quota or access errors.
+  }
+}
+
+function collectCurrentCollapsedGroupIds() {
+  const collapsedIds = [];
+  document.querySelectorAll("tr.group.swimlane[data-id]").forEach((row) => {
+    if (!row.classList.contains("open")) {
+      const rawId = String(row.getAttribute("data-id") || "").trim();
+      collapsedIds.push(rawId === "" ? COLLAPSED_GROUP_NONE_ID : rawId);
+    }
+  });
+  return collapsedIds;
+}
+
+function ensureSwimlaneToolbarStyles() {
+  if (document.getElementById(SWIMLANE_TOOLBAR_STYLE_ID)) return;
+  const style = document.createElement("style");
+  style.id = SWIMLANE_TOOLBAR_STYLE_ID;
+  style.textContent = `
+    .toggle-all {
+      display: none !important;
+    }
+
+    #${SWIMLANE_TOOLBAR_ID} {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+
+    #${SWIMLANE_TOOLBAR_ID} .bluemine-swimlane-btn {
+      height: 26px;
+      padding: 0 12px;
+      border: 1px solid #c7d2de;
+      border-radius: 3px;
+      background: #f4f7fa;
+      color: #3a3a3c;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      line-height: 1;
+    }
+
+    #${SWIMLANE_TOOLBAR_ID} .bluemine-swimlane-btn:hover {
+      background: #e8eef5;
+      border-color: #a8b9cc;
+    }
+
+    #${SWIMLANE_TOOLBAR_ID} .bluemine-swimlane-btn:active {
+      background: #dce6f0;
+    }
+  `;
+  (document.head || document.documentElement).appendChild(style);
+}
+
+function findBoardTable() {
+  const agileTable = document.querySelector("table.agile-board");
+  if (agileTable) return agileTable;
+  const groupRow = document.querySelector("tr.group.swimlane[data-id]");
+  return groupRow ? groupRow.closest("table") : null;
+}
+
+function injectSwimlaneToolbar(onCollapseAll, onExpandAll) {
+  if (document.getElementById(SWIMLANE_TOOLBAR_ID)) return;
+  const boardTable = findBoardTable();
+  if (!boardTable || !boardTable.parentNode) return;
+
+  const toolbar = document.createElement("div");
+  toolbar.id = SWIMLANE_TOOLBAR_ID;
+
+  const collapseBtn = document.createElement("button");
+  collapseBtn.type = "button";
+  collapseBtn.className = "bluemine-swimlane-btn";
+  collapseBtn.textContent = "Collapse all";
+  collapseBtn.addEventListener("click", onCollapseAll);
+
+  const expandBtn = document.createElement("button");
+  expandBtn.type = "button";
+  expandBtn.className = "bluemine-swimlane-btn";
+  expandBtn.textContent = "Expand all";
+  expandBtn.addEventListener("click", onExpandAll);
+
+  toolbar.appendChild(collapseBtn);
+  toolbar.appendChild(expandBtn);
+  boardTable.parentNode.insertBefore(toolbar, boardTable);
+}
+
+function getSiblingIssueRow(groupRow) {
+  // The sibling <tr class="swimlane issue"> shares the same data-id
+  // and immediately follows the group row in the DOM.
+  const id = groupRow.getAttribute("data-id");
+  if (id === null) return null;
+  let next = groupRow.nextElementSibling;
+  while (next) {
+    if (
+      next.tagName === "TR" &&
+      next.classList.contains("swimlane") &&
+      next.classList.contains("issue") &&
+      next.getAttribute("data-id") === id
+    ) {
+      return next;
+    }
+    next = next.nextElementSibling;
+  }
+  return null;
+}
+
+function swapExpanderIcon(expander, href) {
+  const use = expander.querySelector("use");
+  if (!use) return;
+  // The href attribute may be in either the default namespace or the
+  // xlink namespace depending on the Redmine version.
+  if (use.hasAttribute("href")) {
+    const current = use.getAttribute("href");
+    const base = current.split("#")[0];
+    use.setAttribute("href", `${base}#${href}`);
+  } else if (use.hasAttribute("xlink:href")) {
+    const current = use.getAttributeNS(
+      "http://www.w3.org/1999/xlink",
+      "href",
+    );
+    const base = current.split("#")[0];
+    use.setAttributeNS(
+      "http://www.w3.org/1999/xlink",
+      "xlink:href",
+      `${base}#${href}`,
+    );
+  }
+}
+
+function collapseGroupRow(row) {
+  if (!row.classList.contains("open")) return;
+  row.classList.remove("open");
+  const expander = row.querySelector("span.expander");
+  if (expander) {
+    expander.classList.remove("icon-expanded");
+    expander.classList.add("icon-collapsed");
+    swapExpanderIcon(expander, "icon--angle-right");
+  }
+  const issueRow = getSiblingIssueRow(row);
+  if (issueRow) issueRow.style.display = "none";
+}
+
+function expandGroupRow(row) {
+  if (row.classList.contains("open")) return;
+  row.classList.add("open");
+  const expander = row.querySelector("span.expander");
+  if (expander) {
+    expander.classList.remove("icon-collapsed");
+    expander.classList.add("icon-expanded");
+    swapExpanderIcon(expander, "icon--angle-down");
+  }
+  const issueRow = getSiblingIssueRow(row);
+  if (issueRow) issueRow.style.display = "";
+}
+
+function runCollapsedGroupsFeature() {
+  if (!isAgileBoardPage()) return;
+
+  const boardUrl = normalizePageUrl(window.location.href);
+  if (!boardUrl) return;
+
+  const storageKey = COLLAPSED_GROUPS_SESSION_KEY_PREFIX + boardUrl;
+  let isApplyingRestoredState = false;
+
+  function persistCollapsedGroups() {
+    if (isApplyingRestoredState) return;
+    writeCollapsedGroupIds(storageKey, collectCurrentCollapsedGroupIds());
+  }
+
+  const observer = new MutationObserver((mutations) => {
+    if (isApplyingRestoredState) return;
+    let relevant = false;
+    for (const mutation of mutations) {
+      if (mutation.type !== "attributes") continue;
+      const t = mutation.target;
+      if (
+        t.tagName === "TR" &&
+        t.classList.contains("group") &&
+        t.classList.contains("swimlane") &&
+        t.hasAttribute("data-id")
+      ) {
+        relevant = true;
+        break;
+      }
+    }
+    if (relevant) persistCollapsedGroups();
+  });
+  observer.observe(document.body, {
+    subtree: true,
+    attributes: true,
+    attributeFilter: ["class"],
+  });
+
+  const storedIds = readCollapsedGroupIds(storageKey);
+  if (storedIds.length > 0) {
+    const storedIdSet = new Set(storedIds);
+    isApplyingRestoredState = true;
+    document.querySelectorAll("tr.group.swimlane[data-id]").forEach((row) => {
+      const rawId = String(row.getAttribute("data-id") || "").trim();
+      const storageId = rawId === "" ? COLLAPSED_GROUP_NONE_ID : rawId;
+      if (storedIdSet.has(storageId)) {
+        collapseGroupRow(row);
+      }
+    });
+    window.setTimeout(() => {
+      isApplyingRestoredState = false;
+    }, 0);
+  }
+
+  ensureSwimlaneToolbarStyles();
+
+  function handleCollapseAll() {
+    isApplyingRestoredState = true;
+    document.querySelectorAll("tr.group.swimlane[data-id]").forEach((row) => {
+      collapseGroupRow(row);
+    });
+    writeCollapsedGroupIds(storageKey, collectCurrentCollapsedGroupIds());
+    window.setTimeout(() => {
+      isApplyingRestoredState = false;
+    }, 0);
+  }
+
+  function handleExpandAll() {
+    isApplyingRestoredState = true;
+    document.querySelectorAll("tr.group.swimlane[data-id]").forEach((row) => {
+      expandGroupRow(row);
+    });
+    writeCollapsedGroupIds(storageKey, []);
+    window.setTimeout(() => {
+      isApplyingRestoredState = false;
+    }, 0);
+  }
+
+  injectSwimlaneToolbar(handleCollapseAll, handleExpandAll);
 }
 
 function mapMrState(state) {
@@ -1782,13 +2047,10 @@ chrome.storage.sync.get(
   {
     [FEATURE_KEY]: false,
     [GITLAB_MR_FEATURE_KEY]: false,
-    [RESTORE_SCROLL_ON_RELOAD_FEATURE_KEY]: false,
+    [ENHANCED_AGILE_BOARD_FEATURE_KEY]: false,
   },
   async (result) => {
-    // When the browser restores this page from the back-forward cache (BFCache),
-    // content scripts do not re-run. Force a reload so the board fetches fresh
-    // data, exactly as if the user had navigated here normally.
-    if (result[RESTORE_SCROLL_ON_RELOAD_FEATURE_KEY] && isAgileBoardPage()) {
+    if (result[ENHANCED_AGILE_BOARD_FEATURE_KEY] && isAgileBoardPage()) {
       window.addEventListener("pageshow", (event) => {
         if (event.persisted) {
           window.location.reload();
@@ -1798,8 +2060,9 @@ chrome.storage.sync.get(
 
     const matchesDetectedRedmineHeaders = await isDetectedRedmineTab();
     if (!matchesDetectedRedmineHeaders) {
-      if (result[RESTORE_SCROLL_ON_RELOAD_FEATURE_KEY] && isAgileBoardPage()) {
+      if (result[ENHANCED_AGILE_BOARD_FEATURE_KEY] && isAgileBoardPage()) {
         runRestoreScrollOnReloadFeature();
+        runCollapsedGroupsFeature();
       } else {
         removeScrollRestoreOverlayIfReady();
       }
@@ -1819,8 +2082,9 @@ chrome.storage.sync.get(
       setScrollRestoreOverlayHoldForGitlab(true);
     }
 
-    if (result[RESTORE_SCROLL_ON_RELOAD_FEATURE_KEY]) {
+    if (result[ENHANCED_AGILE_BOARD_FEATURE_KEY]) {
       runRestoreScrollOnReloadFeature();
+      runCollapsedGroupsFeature();
     } else {
       removeScrollRestoreOverlayIfReady();
     }
