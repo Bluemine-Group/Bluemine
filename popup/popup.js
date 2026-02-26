@@ -273,16 +273,10 @@ function saveGitlabMrFeatureState(enabled) {
   chrome.storage.sync.get({ [GITLAB_MR_FEATURE_KEY]: false }, (result) => {
     const previous = Boolean(result[GITLAB_MR_FEATURE_KEY]);
     if (previous === enabled) {
-      setStatus("No changes to save");
       return;
     }
 
-    chrome.storage.sync.set({ [GITLAB_MR_FEATURE_KEY]: enabled }, () => {
-      setStatus(
-        enabled ? "GitLab MR status enabled" : "GitLab MR status disabled",
-      );
-      reloadActiveTab();
-    });
+    chrome.storage.sync.set({ [GITLAB_MR_FEATURE_KEY]: enabled });
   });
 }
 
@@ -292,21 +286,10 @@ function saveRestoreScrollOnReloadState(enabled) {
     (result) => {
       const previous = Boolean(result[ENHANCED_AGILE_BOARD_FEATURE_KEY]);
       if (previous === enabled) {
-        setStatus("No changes to save");
         return;
       }
 
-      chrome.storage.sync.set(
-        { [ENHANCED_AGILE_BOARD_FEATURE_KEY]: enabled },
-        () => {
-          setStatus(
-            enabled
-              ? "Scroll restore on reload enabled"
-              : "Scroll restore on reload disabled",
-          );
-          reloadActiveTab();
-        },
-      );
+      chrome.storage.sync.set({ [ENHANCED_AGILE_BOARD_FEATURE_KEY]: enabled });
     },
   );
 }
