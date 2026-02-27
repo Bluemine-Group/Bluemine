@@ -2405,9 +2405,24 @@ function runCommandPaletteFeature(featureResult) {
     }
   }
 
+  function reSelectCards(ids) {
+    const idSet = new Set(ids);
+    document.querySelectorAll(".issue-card[data-id]").forEach((card) => {
+      const id = String(card.getAttribute("data-id") || "").trim();
+      if (!idSet.has(id)) return;
+      card.classList.add("context-menu-selection");
+      const checkbox = card.querySelector('input[name="ids[]"]');
+      if (checkbox) {
+        checkbox.checked = true;
+        checkbox.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+    });
+  }
+
   async function executeCommand(command) {
     if (command.disabled || !command.action) return;
 
+    const selectedIds = getSelectedIssueIds();
     closePalette();
 
     if (command.action.type === "navigate") {
@@ -2431,6 +2446,7 @@ function runCommandPaletteFeature(featureResult) {
     }
 
     await softReloadBoard();
+    reSelectCards(selectedIds);
   }
 
   function renderCommandList() {
@@ -2504,7 +2520,7 @@ function runCommandPaletteFeature(featureResult) {
       #bluemine-command-palette-overlay {
         position: fixed;
         inset: 0;
-        background: rgba(0,0,0,0.38);
+        background: transparent;
         z-index: 99999;
         display: flex;
         align-items: flex-start;
