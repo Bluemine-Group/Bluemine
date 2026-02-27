@@ -3,6 +3,7 @@
 const GITLAB_MR_FEATURE_KEY = "feature.gitlabMrStatus.enabled";
 const ENHANCED_AGILE_BOARD_FEATURE_KEY = "feature.restoreScrollOnReload.enabled";
 const SHIFT_HOVER_SELECTION_FEATURE_KEY = "feature.shiftHoverSelection.enabled";
+const COMMAND_PALETTE_FEATURE_KEY = "feature.commandPalette.enabled";
 const GITLAB_BASE_URL_KEY = "settings.gitlabBaseUrl";
 const GITLAB_API_KEY_KEY = "settings.gitlabApiKey";
 const GITLAB_PROJECT_MAP_KEY = "settings.gitlabProjectMap";
@@ -20,6 +21,7 @@ const restoreScrollOnReloadToggle = document.getElementById(
 const shiftHoverSelectionToggle = document.getElementById(
   "shift-hover-selection-toggle",
 );
+const commandPaletteToggle = document.getElementById("command-palette-toggle");
 const gitlabMrSettings = document.getElementById("gitlab-mr-settings");
 const gitlabUrlInput = document.getElementById("gitlab-url");
 const gitlabApiKeyInput = document.getElementById("gitlab-api-key");
@@ -244,6 +246,7 @@ function readSettings() {
       [GITLAB_MR_FEATURE_KEY]: false,
       [ENHANCED_AGILE_BOARD_FEATURE_KEY]: false,
       [SHIFT_HOVER_SELECTION_FEATURE_KEY]: false,
+      [COMMAND_PALETTE_FEATURE_KEY]: false,
       [GITLAB_BASE_URL_KEY]: "",
       [GITLAB_API_KEY_KEY]: "",
       [GITLAB_PROJECT_MAP_KEY]: "",
@@ -255,6 +258,9 @@ function readSettings() {
       );
       shiftHoverSelectionToggle.checked = Boolean(
         result[SHIFT_HOVER_SELECTION_FEATURE_KEY],
+      );
+      commandPaletteToggle.checked = Boolean(
+        result[COMMAND_PALETTE_FEATURE_KEY],
       );
       setGitlabSettingsVisible(gitlabMrToggle.checked);
       gitlabUrlInput.value = result[GITLAB_BASE_URL_KEY] || "";
@@ -299,6 +305,20 @@ function saveShiftHoverSelectionState(enabled) {
       }
 
       browserAPI.storage.local.set({ [SHIFT_HOVER_SELECTION_FEATURE_KEY]: enabled }, reloadActiveTab);
+    },
+  );
+}
+
+function saveCommandPaletteState(enabled) {
+  browserAPI.storage.local.get(
+    { [COMMAND_PALETTE_FEATURE_KEY]: false },
+    (result) => {
+      const previous = Boolean(result[COMMAND_PALETTE_FEATURE_KEY]);
+      if (previous === enabled) {
+        return;
+      }
+
+      browserAPI.storage.local.set({ [COMMAND_PALETTE_FEATURE_KEY]: enabled }, reloadActiveTab);
     },
   );
 }
@@ -381,6 +401,10 @@ restoreScrollOnReloadToggle.addEventListener("change", (event) => {
 
 shiftHoverSelectionToggle.addEventListener("change", (event) => {
   saveShiftHoverSelectionState(Boolean(event.target.checked));
+});
+
+commandPaletteToggle.addEventListener("change", (event) => {
+  saveCommandPaletteState(Boolean(event.target.checked));
 });
 
 saveGitlabSettingsButton.addEventListener("click", saveGitlabSettings);

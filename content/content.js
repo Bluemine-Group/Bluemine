@@ -3,8 +3,33 @@
 const GITLAB_MR_FEATURE_KEY = "feature.gitlabMrStatus.enabled";
 const ENHANCED_AGILE_BOARD_FEATURE_KEY =
   "feature.restoreScrollOnReload.enabled";
-const SHIFT_HOVER_SELECTION_FEATURE_KEY =
-  "feature.shiftHoverSelection.enabled";
+const SHIFT_HOVER_SELECTION_FEATURE_KEY = "feature.shiftHoverSelection.enabled";
+const COMMAND_PALETTE_FEATURE_KEY = "feature.commandPalette.enabled";
+const COMMAND_PALETTE_OVERLAY_ID = "bluemine-command-palette-overlay";
+const COMMAND_PALETTE_STYLE_ID = "bluemine-command-palette-style";
+const COMMAND_PALETTE_CATEGORIES = new Set([
+  "Status",
+  "Assignee",
+  "Merged",
+  "Reviewer",
+  "Reviewed",
+]);
+const COMMAND_PALETTE_CATEGORY_PREFIXES = [
+  { prefix: "as", category: "Assignee" },
+  { prefix: "re", category: "Reviewer" },
+  { prefix: "mg", category: "Merged" },
+  { prefix: "rd", category: "Reviewed" },
+];
+const COMMAND_PALETTE_STATUS_SHORTCUTS = {
+  cl: "closed",
+  new: "new",
+  ip: "in progress",
+  rs: "resolved",
+  fb: "feedback",
+  rj: "rejected",
+  oh: "on hold",
+  co: "confirmed",
+};
 const BOARD_PATH_REGEX = /\/projects\/([^/]+)\/agile\/board\/?$/;
 const SCROLL_RESTORE_STATE_KEY = "bluemine.scrollRestoreState.v1";
 const SCROLL_RESTORE_WAIT_TIMEOUT_MS = 20000;
@@ -523,7 +548,11 @@ function findRedmineToolbar() {
   return queryButtons;
 }
 
-function injectSwimlaneToolbar(onCollapseAll, onExpandAll, onCollapseConfirmedUnassigned) {
+function injectSwimlaneToolbar(
+  onCollapseAll,
+  onExpandAll,
+  onCollapseConfirmedUnassigned,
+) {
   if (document.getElementById(SWIMLANE_TOOLBAR_ID)) return;
 
   const toolbar = document.createElement("span");
@@ -556,7 +585,10 @@ function injectSwimlaneToolbar(onCollapseAll, onExpandAll, onCollapseConfirmedUn
   collapseConfirmedUnassignedBtn.innerHTML =
     collapseConfirmedUnassignedSvg +
     '<span class="icon-label">Smart collapse</span>';
-  collapseConfirmedUnassignedBtn.addEventListener("click", onCollapseConfirmedUnassigned);
+  collapseConfirmedUnassignedBtn.addEventListener(
+    "click",
+    onCollapseConfirmedUnassigned,
+  );
 
   toolbar.appendChild(collapseConfirmedUnassignedBtn);
   toolbar.appendChild(collapseBtn);
@@ -738,7 +770,9 @@ function runCollapsedGroupsFeature() {
       confirmedCell = allCells[confirmedColumnInfo.columnIndex] ?? null;
     }
     if (!confirmedCell) return false;
-    const confirmedCards = confirmedCell.querySelectorAll(".issue-card[data-id]");
+    const confirmedCards = confirmedCell.querySelectorAll(
+      ".issue-card[data-id]",
+    );
     if (confirmedCards.length === 0) return false;
     for (const cell of allCells) {
       if (cell === confirmedCell) continue;
@@ -788,7 +822,11 @@ function runCollapsedGroupsFeature() {
     }, 0);
   }
 
-  injectSwimlaneToolbar(handleCollapseAll, handleExpandAll, handleCollapseConfirmedUnassigned);
+  injectSwimlaneToolbar(
+    handleCollapseAll,
+    handleExpandAll,
+    handleCollapseConfirmedUnassigned,
+  );
 }
 
 function mapMrState(state) {
@@ -2179,6 +2217,536 @@ async function runGitlabMrStatusFeature() {
   }
 }
 
+function runCommandPaletteFeature(featureResult) {
+  if (!isAgileBoardPage()) return;
+
+  let isOpen = false;
+  let allCommands = [];
+  let filteredCommands = [];
+  let activeIndex = 0;
+  let paletteCSRFToken = "";
+
+  function getSelectedIssueIds() {
+    const seen = new Set();
+    document
+      .querySelectorAll('.context-menu-selection input[name="ids[]"]')
+      .forEach((input) => {
+        const id = String(input.value || "").trim();
+        if (id) seen.add(id);
+      });
+    return [...seen];
+  }
+
+  function getPaletteCSRFToken() {
+    return (
+      document
+        .querySelector('meta[name="csrf-token"]')
+        ?.getAttribute("content") || ""
+    );
+  }
+
+  function buildBulkEditUrl(issueIds) {
+    const params = new URLSearchParams();
+    for (const id of issueIds) params.append("ids[]", id);
+    return `/issues/bulk_edit?${params}`;
+  }
+
+  async function fetchContextMenuHtml(issueIds) {
+    const params = new URLSearchParams();
+    for (const id of issueIds) params.append("ids[]", id);
+    params.append(
+      "back_url",
+      window.location.pathname + window.location.search,
+    );
+    const res = await fetch(`/issues/context_menu?${params}`, {
+      credentials: "same-origin",
+      headers: { "X-Requested-With": "XMLHttpRequest" },
+    });
+    if (!res.ok) return null;
+    return res.text();
+  }
+
+  function parseContextMenuCommands(html) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, "text/html");
+    const commands = [];
+
+    for (const folder of doc.querySelectorAll("li.folder")) {
+      const category = folder
+        .querySelector(":scope > a.submenu")
+        ?.textContent.trim();
+      if (!category || !COMMAND_PALETTE_CATEGORIES.has(category)) continue;
+
+      for (const li of folder.querySelectorAll(":scope > ul > li")) {
+        const link = li.querySelector("a");
+        if (!link) continue;
+
+        const isDisabled =
+          link.classList.contains("disabled") ||
+          link.getAttribute("href") === "#";
+        const iconLabel = link.querySelector(".icon-label");
+        const label = (iconLabel?.textContent || link.textContent).trim();
+        const href = link.getAttribute("href");
+
+        if (!label) continue;
+
+        commands.push({
+          id: `${category}-${label}`.toLowerCase().replace(/\s+/g, "-"),
+          category,
+          label,
+          disabled: isDisabled,
+          action: isDisabled ? null : { type: "patch", url: href },
+        });
+      }
+    }
+
+    return commands;
+  }
+
+  // Person-name abbreviation: first letter of first name + first letter of
+  // last name + last letter of last name, e.g. "Max Assermark" → "mak",
+  // "Joakim Johansson" → "jjn".
+  function matchesPersonAbbreviation(label, query) {
+    const parts = label.trim().split(/\s+/);
+    if (parts.length < 2) return false;
+    const first = parts[0];
+    const last = parts[parts.length - 1];
+    if (!first.length || !last.length) return false;
+    const abbrev = (first[0] + last[0] + last[last.length - 1]).toLowerCase();
+    return abbrev.startsWith(query);
+  }
+
+  const PERSON_CATEGORIES = new Set(["Assignee", "Reviewer"]);
+
+  function filterCommands(query) {
+    const q = query.toLowerCase().trim();
+
+    if (!q) return allCommands;
+
+    if (q === "be") {
+      return allCommands.filter((c) => c.category === "Bulk Edit");
+    }
+
+    for (const { prefix, category } of COMMAND_PALETTE_CATEGORY_PREFIXES) {
+      if (q === prefix || q.startsWith(prefix + " ")) {
+        const nameQ = q.slice(prefix.length).trim();
+        const catItems = allCommands.filter((c) => c.category === category);
+        if (!nameQ) return catItems;
+        return catItems.filter(
+          (c) =>
+            c.label.toLowerCase().includes(nameQ) ||
+            matchesPersonAbbreviation(c.label, nameQ),
+        );
+      }
+    }
+
+    const shortcutTarget = COMMAND_PALETTE_STATUS_SHORTCUTS[q];
+    if (shortcutTarget) {
+      return allCommands.filter(
+        (c) =>
+          c.category === "Status" && c.label.toLowerCase() === shortcutTarget,
+      );
+    }
+
+    return allCommands.filter((c) => {
+      const combined = `${c.category} ${c.label}`.toLowerCase();
+      if (combined.includes(q)) return true;
+      if (PERSON_CATEGORIES.has(c.category)) {
+        return matchesPersonAbbreviation(c.label, q);
+      }
+      return false;
+    });
+  }
+
+  function getFirstEnabledIndex(commands) {
+    const idx = commands.findIndex((c) => !c.disabled);
+    return idx >= 0 ? idx : 0;
+  }
+
+  async function softReloadBoard() {
+    const indicator = document.getElementById("ajax-indicator");
+    if (indicator) indicator.style.display = "block";
+
+    try {
+      const response = await fetch(window.location.href, {
+        credentials: "same-origin",
+      });
+      if (!response.ok) throw new Error("fetch failed");
+
+      const html = await response.text();
+      const parser = new DOMParser();
+      const newDoc = parser.parseFromString(html, "text/html");
+
+      const newContent = newDoc.getElementById("content");
+      const curContent = document.getElementById("content");
+
+      if (!newContent || !curContent) {
+        window.location.reload();
+        return;
+      }
+
+      curContent.innerHTML = newContent.innerHTML;
+
+      // Re-run features whose DOM lives inside #content and was replaced.
+      if (featureResult[ENHANCED_AGILE_BOARD_FEATURE_KEY]) {
+        runCollapsedGroupsFeature();
+      }
+      if (featureResult[GITLAB_MR_FEATURE_KEY]) {
+        runGitlabMrStatusFeature();
+      }
+    } catch (_e) {
+      window.location.reload();
+      return;
+    } finally {
+      // Re-query the DOM — the original element may have been replaced by
+      // the innerHTML swap if #ajax-indicator lives inside #content.
+      const currentIndicator = document.getElementById("ajax-indicator");
+      if (currentIndicator) currentIndicator.style.display = "none";
+    }
+  }
+
+  async function executeCommand(command) {
+    if (command.disabled || !command.action) return;
+
+    closePalette();
+
+    if (command.action.type === "navigate") {
+      window.location.href = command.action.url;
+      return;
+    }
+
+    const body = new URLSearchParams();
+    body.append("_method", "patch");
+    body.append("authenticity_token", paletteCSRFToken);
+
+    try {
+      await fetch(command.action.url, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: body.toString(),
+      });
+    } catch (_e) {
+      // fall through to soft-reload
+    }
+
+    await softReloadBoard();
+  }
+
+  function renderCommandList() {
+    const listEl = document.getElementById("bluemine-command-list");
+    const statusEl = document.getElementById("bluemine-command-status-msg");
+    if (!listEl || !statusEl) return;
+
+    if (filteredCommands.length === 0) {
+      listEl.innerHTML = "";
+      statusEl.hidden = false;
+      statusEl.textContent = "No matching commands";
+      return;
+    }
+
+    statusEl.hidden = true;
+    listEl.innerHTML = "";
+
+    filteredCommands.forEach((cmd, i) => {
+      const li = document.createElement("li");
+      li.className =
+        "bluemine-command-item" +
+        (cmd.disabled ? " is-disabled" : "") +
+        (i === activeIndex ? " is-active" : "");
+
+      const catSpan = document.createElement("span");
+      catSpan.className = "bluemine-command-category";
+      catSpan.textContent = cmd.category;
+
+      const labelSpan = document.createElement("span");
+      labelSpan.className = "bluemine-command-label";
+      labelSpan.textContent = cmd.label;
+
+      li.appendChild(catSpan);
+      li.appendChild(labelSpan);
+
+      if (!cmd.disabled) {
+        li.addEventListener("mousedown", (e) => {
+          e.preventDefault();
+          executeCommand(cmd);
+        });
+        li.addEventListener("mousemove", () => {
+          if (activeIndex !== i) {
+            activeIndex = i;
+            renderCommandList();
+          }
+        });
+      }
+
+      listEl.appendChild(li);
+    });
+
+    const activeItem = listEl.querySelector(".is-active");
+    if (activeItem) activeItem.scrollIntoView({ block: "nearest" });
+  }
+
+  function setCommandPaletteStatus(msg) {
+    const listEl = document.getElementById("bluemine-command-list");
+    const statusEl = document.getElementById("bluemine-command-status-msg");
+    if (listEl) listEl.innerHTML = "";
+    if (statusEl) {
+      statusEl.hidden = false;
+      statusEl.textContent = msg;
+    }
+  }
+
+  function ensureCommandPaletteStyles() {
+    if (document.getElementById(COMMAND_PALETTE_STYLE_ID)) return;
+    const style = document.createElement("style");
+    style.id = COMMAND_PALETTE_STYLE_ID;
+    style.textContent = `
+      #bluemine-command-palette-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.38);
+        z-index: 99999;
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        padding-top: 14vh;
+        box-sizing: border-box;
+      }
+      #bluemine-command-palette {
+        background: #fff;
+        border-radius: 10px;
+        box-shadow: 0 12px 40px rgba(0,0,0,0.22), 0 2px 8px rgba(0,0,0,0.12);
+        width: 500px;
+        max-width: 92vw;
+        overflow: hidden;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-size: 14px;
+        line-height: 1.4;
+        color: #1a1a1a;
+      }
+      #bluemine-command-input-wrap {
+        display: flex;
+        align-items: center;
+        padding: 12px 14px;
+        border-bottom: 1px solid #ebebeb;
+        gap: 10px;
+        box-sizing: border-box;
+      }
+      #bluemine-command-input {
+        flex: 1;
+        border: none;
+        outline: none;
+        font-size: 14px;
+        font-family: inherit;
+        color: #1a1a1a;
+        background: transparent;
+        min-width: 0;
+        padding: 0;
+        margin: 0;
+      }
+      #bluemine-command-input::placeholder {
+        color: #aaa;
+      }
+      #bluemine-command-badge {
+        font-size: 11px;
+        font-weight: 600;
+        background: #3d5afe;
+        color: #fff;
+        border-radius: 10px;
+        padding: 2px 9px;
+        white-space: nowrap;
+        flex-shrink: 0;
+        line-height: 1.6;
+      }
+      #bluemine-command-list {
+        list-style: none;
+        margin: 0;
+        padding: 4px 0;
+        max-height: 300px;
+        overflow-y: auto;
+      }
+      .bluemine-command-item {
+        display: flex;
+        align-items: center;
+        padding: 7px 14px;
+        cursor: pointer;
+        gap: 10px;
+        user-select: none;
+        box-sizing: border-box;
+      }
+      .bluemine-command-item.is-active {
+        background: #eef1ff;
+      }
+      .bluemine-command-item.is-disabled {
+        opacity: 0.42;
+        cursor: default;
+        pointer-events: none;
+      }
+      .bluemine-command-item.is-active.is-disabled {
+        background: #f5f5f5;
+      }
+      .bluemine-command-category {
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: #999;
+        min-width: 68px;
+        flex-shrink: 0;
+      }
+      .bluemine-command-label {
+        font-size: 13px;
+        color: #1a1a1a;
+        flex: 1;
+      }
+      #bluemine-command-status-msg {
+        padding: 14px;
+        color: #888;
+        font-size: 13px;
+        text-align: center;
+      }
+      #bluemine-command-footer {
+        border-top: 1px solid #f0f0f0;
+        padding: 6px 14px;
+        font-size: 11px;
+        color: #bbb;
+        text-align: center;
+        letter-spacing: 0.02em;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function openCommandPalette(selectedIds) {
+    if (isOpen) return;
+    isOpen = true;
+    paletteCSRFToken = getPaletteCSRFToken();
+
+    ensureCommandPaletteStyles();
+
+    const overlay = document.createElement("div");
+    overlay.id = COMMAND_PALETTE_OVERLAY_ID;
+
+    const selectedCount = selectedIds.length;
+    overlay.innerHTML = `
+      <div id="bluemine-command-palette">
+        <div id="bluemine-command-input-wrap">
+          <input
+            id="bluemine-command-input"
+            type="text"
+            placeholder="Search for commands and people..."
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <span id="bluemine-command-badge">${selectedCount} card${selectedCount !== 1 ? "s" : ""} selected</span>
+        </div>
+        <ul id="bluemine-command-list"></ul>
+        <div id="bluemine-command-status-msg">Loading\u2026</div>
+        <div id="bluemine-command-footer">\u2191\u2193 navigate \u00b7 Enter select \u00b7 Esc close</div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    overlay.addEventListener("mousedown", (e) => {
+      if (e.target === overlay) closePalette();
+    });
+
+    const input = document.getElementById("bluemine-command-input");
+    if (input) input.focus();
+
+    fetchContextMenuHtml(selectedIds)
+      .then((html) => {
+        if (!isOpen) return;
+        if (!html) {
+          setCommandPaletteStatus("Could not load options");
+          return;
+        }
+        const parsed = parseContextMenuCommands(html);
+        allCommands = [
+          {
+            id: "bulk-edit",
+            category: "Bulk Edit",
+            label: "Bulk edit",
+            disabled: false,
+            action: { type: "navigate", url: buildBulkEditUrl(selectedIds) },
+          },
+          ...parsed,
+        ];
+        filteredCommands = allCommands;
+        activeIndex = getFirstEnabledIndex(filteredCommands);
+        renderCommandList();
+      })
+      .catch(() => {
+        if (isOpen) setCommandPaletteStatus("Could not load options");
+      });
+  }
+
+  function closePalette() {
+    isOpen = false;
+    allCommands = [];
+    filteredCommands = [];
+    activeIndex = 0;
+    const overlay = document.getElementById(COMMAND_PALETTE_OVERLAY_ID);
+    if (overlay) overlay.remove();
+  }
+
+  document.addEventListener(
+    "keydown",
+    (e) => {
+      if (!isOpen) {
+        if (e.key !== " ") return;
+        const tag = (document.activeElement?.tagName || "").toLowerCase();
+        if (["input", "textarea", "select"].includes(tag)) return;
+        if (document.activeElement?.isContentEditable) return;
+        const selectedIds = getSelectedIssueIds();
+        if (selectedIds.length === 0) return;
+        e.preventDefault();
+        openCommandPalette(selectedIds);
+        return;
+      }
+
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        closePalette();
+        return;
+      }
+
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        if (activeIndex < filteredCommands.length - 1) activeIndex++;
+        renderCommandList();
+        return;
+      }
+
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        if (activeIndex > 0) activeIndex--;
+        renderCommandList();
+        return;
+      }
+
+      if (e.key === "Enter") {
+        e.preventDefault();
+        const cmd = filteredCommands[activeIndex];
+        if (cmd) executeCommand(cmd);
+        return;
+      }
+    },
+    { capture: true },
+  );
+
+  document.addEventListener("input", (e) => {
+    if (!isOpen) return;
+    const input = document.getElementById("bluemine-command-input");
+    if (e.target !== input) return;
+    filteredCommands = filterCommands(input.value);
+    activeIndex = getFirstEnabledIndex(filteredCommands);
+    renderCommandList();
+  });
+}
+
 function runShiftHoverSelectionFeature() {
   if (!isAgileBoardPage()) return;
 
@@ -2194,15 +2762,23 @@ function runShiftHoverSelectionFeature() {
     }
   }
 
-  document.addEventListener("keydown", (e) => {
-    if (e.key !== "Shift") return;
-    shiftHeld = true;
-    selectCard(document.querySelector(".issue-card:hover"));
-  }, { capture: true });
+  document.addEventListener(
+    "keydown",
+    (e) => {
+      if (e.key !== "Shift") return;
+      shiftHeld = true;
+      selectCard(document.querySelector(".issue-card:hover"));
+    },
+    { capture: true },
+  );
 
-  document.addEventListener("keyup", (e) => {
-    if (e.key === "Shift") shiftHeld = false;
-  }, { capture: true });
+  document.addEventListener(
+    "keyup",
+    (e) => {
+      if (e.key === "Shift") shiftHeld = false;
+    },
+    { capture: true },
+  );
 
   window.addEventListener("blur", () => {
     shiftHeld = false;
@@ -2219,6 +2795,7 @@ browserAPI.storage.local.get(
     [GITLAB_MR_FEATURE_KEY]: false,
     [ENHANCED_AGILE_BOARD_FEATURE_KEY]: false,
     [SHIFT_HOVER_SELECTION_FEATURE_KEY]: false,
+    [COMMAND_PALETTE_FEATURE_KEY]: false,
   },
   async (result) => {
     if (result[ENHANCED_AGILE_BOARD_FEATURE_KEY] && isAgileBoardPage()) {
@@ -2241,6 +2818,9 @@ browserAPI.storage.local.get(
       if (result[SHIFT_HOVER_SELECTION_FEATURE_KEY] && isAgileBoardPage()) {
         runShiftHoverSelectionFeature();
       }
+      if (result[COMMAND_PALETTE_FEATURE_KEY] && isAgileBoardPage()) {
+        runCommandPaletteFeature(result);
+      }
       return;
     }
 
@@ -2262,6 +2842,9 @@ browserAPI.storage.local.get(
     }
     if (result[SHIFT_HOVER_SELECTION_FEATURE_KEY] && isAgileBoardPage()) {
       runShiftHoverSelectionFeature();
+    }
+    if (result[COMMAND_PALETTE_FEATURE_KEY] && isAgileBoardPage()) {
+      runCommandPaletteFeature(result);
     }
 
     if (result[GITLAB_MR_FEATURE_KEY]) {
