@@ -523,7 +523,7 @@ function findRedmineToolbar() {
   return queryButtons;
 }
 
-function injectSwimlaneToolbar(onCollapseAll, onExpandAll) {
+function injectSwimlaneToolbar(onCollapseAll, onExpandAll, onCollapseConfirmedUnassigned) {
   if (document.getElementById(SWIMLANE_TOOLBAR_ID)) return;
 
   const toolbar = document.createElement("span");
@@ -533,6 +533,8 @@ function injectSwimlaneToolbar(onCollapseAll, onExpandAll) {
     '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 20 5-5 5 5"/><path d="m7 4 5 5 5-5"/></svg>';
   const expandSvg =
     '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></svg>';
+  const collapseConfirmedUnassignedSvg =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="17" x2="22" y1="8" y2="13"/><line x1="22" x2="17" y1="8" y2="13"/></svg>';
 
   const collapseBtn = document.createElement("button");
   collapseBtn.type = "button";
@@ -548,6 +550,15 @@ function injectSwimlaneToolbar(onCollapseAll, onExpandAll) {
     expandSvg + '<span class="icon-label">Expand all</span>';
   expandBtn.addEventListener("click", onExpandAll);
 
+  const collapseConfirmedUnassignedBtn = document.createElement("button");
+  collapseConfirmedUnassignedBtn.type = "button";
+  collapseConfirmedUnassignedBtn.className = "bluemine-swimlane-btn";
+  collapseConfirmedUnassignedBtn.innerHTML =
+    collapseConfirmedUnassignedSvg +
+    '<span class="icon-label">Smart collapse</span>';
+  collapseConfirmedUnassignedBtn.addEventListener("click", onCollapseConfirmedUnassigned);
+
+  toolbar.appendChild(collapseConfirmedUnassignedBtn);
   toolbar.appendChild(collapseBtn);
   toolbar.appendChild(expandBtn);
 
@@ -700,6 +711,46 @@ function runCollapsedGroupsFeature() {
 
   ensureSwimlaneToolbarStyles();
 
+  function findConfirmedColumnInfo() {
+    const table = findBoardTable();
+    if (!table) return null;
+    for (const th of table.querySelectorAll("th[data-column-id]")) {
+      if (th.textContent.trim().toLowerCase().startsWith("confirmed")) {
+        const siblings = Array.from(th.parentElement.children);
+        return {
+          columnId: th.getAttribute("data-column-id"),
+          columnIndex: siblings.indexOf(th),
+        };
+      }
+    }
+    return null;
+  }
+
+  function isRowAllConfirmedAndUnassigned(groupRow, confirmedColumnInfo) {
+    const issueRow = getSiblingIssueRow(groupRow);
+    if (!issueRow) return false;
+    const allCells = Array.from(issueRow.querySelectorAll("td"));
+    if (allCells.length === 0) return false;
+    let confirmedCell = issueRow.querySelector(
+      `td[data-column-id="${confirmedColumnInfo.columnId}"]`,
+    );
+    if (!confirmedCell) {
+      confirmedCell = allCells[confirmedColumnInfo.columnIndex] ?? null;
+    }
+    if (!confirmedCell) return false;
+    const confirmedCards = confirmedCell.querySelectorAll(".issue-card[data-id]");
+    if (confirmedCards.length === 0) return false;
+    for (const cell of allCells) {
+      if (cell === confirmedCell) continue;
+      if (cell.querySelector(".issue-card[data-id]")) return false;
+    }
+    for (const card of confirmedCards) {
+      const assignee = card.querySelector("p.info.assigned-user a.user");
+      if (assignee && assignee.textContent.trim()) return false;
+    }
+    return true;
+  }
+
   function handleCollapseAll() {
     isApplyingRestoredState = true;
     document.querySelectorAll("tr.group.swimlane[data-id]").forEach((row) => {
@@ -722,7 +773,22 @@ function runCollapsedGroupsFeature() {
     }, 0);
   }
 
-  injectSwimlaneToolbar(handleCollapseAll, handleExpandAll);
+  function handleCollapseConfirmedUnassigned() {
+    const confirmedColumnInfo = findConfirmedColumnInfo();
+    if (!confirmedColumnInfo) return;
+    isApplyingRestoredState = true;
+    document.querySelectorAll("tr.group.swimlane[data-id]").forEach((row) => {
+      if (isRowAllConfirmedAndUnassigned(row, confirmedColumnInfo)) {
+        collapseGroupRow(row);
+      }
+    });
+    writeCollapsedGroupIds(storageKey, collectCurrentCollapsedGroupIds());
+    window.setTimeout(() => {
+      isApplyingRestoredState = false;
+    }, 0);
+  }
+
+  injectSwimlaneToolbar(handleCollapseAll, handleExpandAll, handleCollapseConfirmedUnassigned);
 }
 
 function mapMrState(state) {
