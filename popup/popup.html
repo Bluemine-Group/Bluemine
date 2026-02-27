@@ -1,178 +1,164 @@
 <!doctype html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Bluemine Settings</title>
-        <link rel="stylesheet" href="popup.css" />
-    </head>
-    <body>
-        <main class="popup">
-            <header class="hero">
-                <a
-                    id="github-link"
-                    class="github-link"
-                    href="https://github.com/webjocke/Bluemine"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label="Open Bluemine on GitHub"
-                    title="Open Bluemine on GitHub"
-                >
-                    <span class="github-link-label" aria-hidden="true"
-                        >New version available</span
-                    >
-                    <svg
-                        viewBox="0 0 24 24"
-                        aria-hidden="true"
-                        focusable="false"
-                    >
-                        <path
-                            d="M12 1.5a10.5 10.5 0 0 0-3.32 20.46c.53.1.73-.23.73-.52v-1.9c-2.97.65-3.6-1.43-3.6-1.43-.49-1.24-1.19-1.57-1.19-1.57-.97-.66.07-.65.07-.65 1.08.08 1.64 1.11 1.64 1.11.95 1.64 2.5 1.17 3.11.89.1-.69.38-1.17.68-1.44-2.37-.27-4.87-1.18-4.87-5.27 0-1.16.41-2.11 1.1-2.85-.11-.27-.48-1.37.1-2.86 0 0 .9-.29 2.94 1.09a10.16 10.16 0 0 1 5.36 0c2.04-1.38 2.94-1.09 2.94-1.09.58 1.49.21 2.59.1 2.86.69.74 1.1 1.69 1.1 2.85 0 4.1-2.5 5-4.88 5.27.39.34.74 1.02.74 2.06v3.05c0 .29.19.63.74.52A10.5 10.5 0 0 0 12 1.5Z"
-                        ></path>
-                    </svg>
-                </a>
-                <div class="hero-identity">
-                    <img
-                        src="../icons/icon48.png"
-                        class="hero-icon"
-                        alt="Bluemine"
-                        aria-hidden="true"
-                    />
-                    <div class="hero-text">
-                        <h1>Bluemine</h1>
-                        <p class="hero-tagline">
-                            Your Redmine experience, enhanced.
-                        </p>
-                    </div>
-                </div>
-            </header>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bluemine Settings</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="popup">
+      <header class="hero">
+        <a
+          id="github-link"
+          class="github-link"
+          href="https://github.com/Bluemine-Group/Bluemine"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Open Bluemine on GitHub"
+          title="Open Bluemine on GitHub"
+        >
+          <span class="github-link-label" aria-hidden="true"
+            >New version available</span
+          >
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path
+              d="M12 1.5a10.5 10.5 0 0 0-3.32 20.46c.53.1.73-.23.73-.52v-1.9c-2.97.65-3.6-1.43-3.6-1.43-.49-1.24-1.19-1.57-1.19-1.57-.97-.66.07-.65.07-.65 1.08.08 1.64 1.11 1.64 1.11.95 1.64 2.5 1.17 3.11.89.1-.69.38-1.17.68-1.44-2.37-.27-4.87-1.18-4.87-5.27 0-1.16.41-2.11 1.1-2.85-.11-.27-.48-1.37.1-2.86 0 0 .9-.29 2.94 1.09a10.16 10.16 0 0 1 5.36 0c2.04-1.38 2.94-1.09 2.94-1.09.58 1.49.21 2.59.1 2.86.69.74 1.1 1.69 1.1 2.85 0 4.1-2.5 5-4.88 5.27.39.34.74 1.02.74 2.06v3.05c0 .29.19.63.74.52A10.5 10.5 0 0 0 12 1.5Z"
+            ></path>
+          </svg>
+        </a>
+        <div class="hero-identity">
+          <img
+            src="../icons/icon48.png"
+            class="hero-icon"
+            alt="Bluemine"
+            aria-hidden="true"
+          />
+          <div class="hero-text">
+            <h1>Bluemine</h1>
+            <p class="hero-tagline">Your Redmine experience, enhanced.</p>
+          </div>
+        </div>
+      </header>
 
-            <section class="glass-group">
-                <label class="setting-row toggle-row" for="gitlab-mr-toggle">
-                    <span class="row-copy">
-                        <span class="setting-title">GitLab Integration</span>
-                        <span class="setting-subtitle"
-                            >Show merge-request status on Agile board cards and
-                            stories</span
-                        >
-                    </span>
-                    <span class="switch-shell">
-                        <input id="gitlab-mr-toggle" type="checkbox" />
-                        <span class="switch-ui" aria-hidden="true"></span>
-                    </span>
-                </label>
+      <section class="glass-group">
+        <label class="setting-row toggle-row" for="gitlab-mr-toggle">
+          <span class="row-copy">
+            <span class="setting-title">GitLab Integration</span>
+            <span class="setting-subtitle"
+              >Show merge-request status on Agile board cards and stories</span
+            >
+          </span>
+          <span class="switch-shell">
+            <input id="gitlab-mr-toggle" type="checkbox" />
+            <span class="switch-ui" aria-hidden="true"></span>
+          </span>
+        </label>
 
-                <div
-                    id="gitlab-mr-settings"
-                    class="conditional-settings is-hidden"
-                    aria-hidden="true"
-                >
-                    <div class="input-row">
-                        <label class="field-name" for="gitlab-url"
-                            >GitLab Base URL</label
-                        >
-                        <input
-                            id="gitlab-url"
-                            class="row-input"
-                            type="url"
-                            placeholder="https://gitlab.example.com"
-                            spellcheck="false"
-                        />
-                    </div>
+        <div
+          id="gitlab-mr-settings"
+          class="conditional-settings is-hidden"
+          aria-hidden="true"
+        >
+          <div class="input-row">
+            <label class="field-name" for="gitlab-url">GitLab Base URL</label>
+            <input
+              id="gitlab-url"
+              class="row-input"
+              type="url"
+              placeholder="https://gitlab.example.com"
+              spellcheck="false"
+            />
+          </div>
 
-                    <div class="input-row">
-                        <label class="field-name" for="gitlab-api-key"
-                            >GitLab API Key</label
-                        >
-                        <input
-                            id="gitlab-api-key"
-                            class="row-input"
-                            type="password"
-                            placeholder="glpat-..."
-                            spellcheck="false"
-                        />
-                    </div>
+          <div class="input-row">
+            <label class="field-name" for="gitlab-api-key"
+              >GitLab API Key</label
+            >
+            <input
+              id="gitlab-api-key"
+              class="row-input"
+              type="password"
+              placeholder="glpat-..."
+              spellcheck="false"
+            />
+          </div>
 
-                    <div class="stack-field">
-                        <label class="field-name" for="project-map"
-                            >Project Mapping (one per line)</label
-                        >
-                        <textarea
-                            id="project-map"
-                            class="stack-input"
-                            placeholder="redmine-project=123&#10;another-project=456"
-                            spellcheck="false"
-                        ></textarea>
-                    </div>
+          <div class="stack-field">
+            <label class="field-name" for="project-map"
+              >Project Mapping (one per line)</label
+            >
+            <textarea
+              id="project-map"
+              class="stack-input"
+              placeholder="redmine-project=123&#10;another-project=456"
+              spellcheck="false"
+            ></textarea>
+          </div>
 
-                    <div class="actions">
-                        <span id="status" class="status" aria-live="polite" role="status"></span>
-                        <button
-                            id="save-gitlab-settings"
-                            type="button"
-                            class="button"
-                        >
-                            Save GitLab Settings
-                        </button>
-                    </div>
-                </div>
-            </section>
+          <div class="actions">
+            <span
+              id="status"
+              class="status"
+              aria-live="polite"
+              role="status"
+            ></span>
+            <button id="save-gitlab-settings" type="button" class="button">
+              Save GitLab Settings
+            </button>
+          </div>
+        </div>
+      </section>
 
-            <section class="glass-group">
-                <label
-                    class="setting-row toggle-row"
-                    for="restore-scroll-on-reload-toggle"
-                >
-                    <span class="row-copy">
-                        <span class="setting-title">Enhanced Agile board</span>
-                        <span class="setting-subtitle"
-                            >– Restore scroll position on reload</span
-                        >
-                        <span class="setting-subtitle"
-                            >– Auto-reload when navigating back to board</span
-                        >
-                        <span class="setting-subtitle"
-                            >– Remember collapsed/expanded row state</span
-                        >
-                        <span class="setting-subtitle"
-                            >– Collapse all/Expand all buttons fixed so they
-                            now work and added above the board</span
-                        >
-                    </span>
-                    <span class="switch-shell">
-                        <input
-                            id="restore-scroll-on-reload-toggle"
-                            type="checkbox"
-                        />
-                        <span class="switch-ui" aria-hidden="true"></span>
-                    </span>
-                </label>
-            </section>
+      <section class="glass-group">
+        <label
+          class="setting-row toggle-row"
+          for="restore-scroll-on-reload-toggle"
+        >
+          <span class="row-copy">
+            <span class="setting-title">Enhanced Agile board</span>
+            <span class="setting-subtitle"
+              >– Restore scroll position on reload</span
+            >
+            <span class="setting-subtitle"
+              >– Auto-reload when navigating back to board</span
+            >
+            <span class="setting-subtitle"
+              >– Remember collapsed/expanded row state</span
+            >
+            <span class="setting-subtitle"
+              >– Collapse all/Expand all buttons fixed so they now work and
+              added above the board</span
+            >
+          </span>
+          <span class="switch-shell">
+            <input id="restore-scroll-on-reload-toggle" type="checkbox" />
+            <span class="switch-ui" aria-hidden="true"></span>
+          </span>
+        </label>
+      </section>
 
-            <section class="glass-group">
-                <label
-                    class="setting-row toggle-row"
-                    for="shift-hover-selection-toggle"
-                >
-                    <span class="row-copy">
-                        <span class="setting-title">Shift+Hover Selection</span>
-                        <span class="setting-subtitle"
-                            >Hold Shift and hover over cards on the Agile board
-                            to select them</span
-                        >
-                    </span>
-                    <span class="switch-shell">
-                        <input
-                            id="shift-hover-selection-toggle"
-                            type="checkbox"
-                        />
-                        <span class="switch-ui" aria-hidden="true"></span>
-                    </span>
-                </label>
-            </section>
-        </main>
+      <section class="glass-group">
+        <label
+          class="setting-row toggle-row"
+          for="shift-hover-selection-toggle"
+        >
+          <span class="row-copy">
+            <span class="setting-title">Shift+Hover Selection</span>
+            <span class="setting-subtitle"
+              >Hold Shift and hover over cards on the Agile board to select
+              them</span
+            >
+          </span>
+          <span class="switch-shell">
+            <input id="shift-hover-selection-toggle" type="checkbox" />
+            <span class="switch-ui" aria-hidden="true"></span>
+          </span>
+        </label>
+      </section>
+    </main>
 
-        <script src="../lib/browser-polyfill.js"></script>
-        <script src="popup.js"></script>
-    </body>
+    <script src="../lib/browser-polyfill.js"></script>
+    <script src="popup.js"></script>
+  </body>
 </html>
