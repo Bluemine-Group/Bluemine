@@ -271,7 +271,7 @@ function saveGitlabMrFeatureState(enabled) {
       return;
     }
 
-    browserAPI.storage.local.set({ [GITLAB_MR_FEATURE_KEY]: enabled });
+    browserAPI.storage.local.set({ [GITLAB_MR_FEATURE_KEY]: enabled }, reloadActiveTab);
   });
 }
 
@@ -284,7 +284,7 @@ function saveRestoreScrollOnReloadState(enabled) {
         return;
       }
 
-      browserAPI.storage.local.set({ [ENHANCED_AGILE_BOARD_FEATURE_KEY]: enabled });
+      browserAPI.storage.local.set({ [ENHANCED_AGILE_BOARD_FEATURE_KEY]: enabled }, reloadActiveTab);
     },
   );
 }
@@ -298,7 +298,7 @@ function saveShiftHoverSelectionState(enabled) {
         return;
       }
 
-      browserAPI.storage.local.set({ [SHIFT_HOVER_SELECTION_FEATURE_KEY]: enabled });
+      browserAPI.storage.local.set({ [SHIFT_HOVER_SELECTION_FEATURE_KEY]: enabled }, reloadActiveTab);
     },
   );
 }
