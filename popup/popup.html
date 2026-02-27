@@ -134,10 +134,36 @@
                         <span class="setting-subtitle"
                             >– Remember collapsed/expanded row state</span
                         >
+                        <span class="setting-subtitle"
+                            >– Collapse all/Expand all buttons fixed so they
+                            now work and added above the board</span
+                        >
                     </span>
                     <span class="switch-shell">
                         <input
                             id="restore-scroll-on-reload-toggle"
+                            type="checkbox"
+                        />
+                        <span class="switch-ui" aria-hidden="true"></span>
+                    </span>
+                </label>
+            </section>
+
+            <section class="glass-group">
+                <label
+                    class="setting-row toggle-row"
+                    for="shift-hover-selection-toggle"
+                >
+                    <span class="row-copy">
+                        <span class="setting-title">Shift+Hover Selection</span>
+                        <span class="setting-subtitle"
+                            >Hold Shift and hover over cards on the Agile board
+                            to select them</span
+                        >
+                    </span>
+                    <span class="switch-shell">
+                        <input
+                            id="shift-hover-selection-toggle"
                             type="checkbox"
                         />
                         <span class="switch-ui" aria-hidden="true"></span>

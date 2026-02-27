@@ -2,6 +2,7 @@
 
 const GITLAB_MR_FEATURE_KEY = "feature.gitlabMrStatus.enabled";
 const ENHANCED_AGILE_BOARD_FEATURE_KEY = "feature.restoreScrollOnReload.enabled";
+const SHIFT_HOVER_SELECTION_FEATURE_KEY = "feature.shiftHoverSelection.enabled";
 const GITLAB_BASE_URL_KEY = "settings.gitlabBaseUrl";
 const GITLAB_API_KEY_KEY = "settings.gitlabApiKey";
 const GITLAB_PROJECT_MAP_KEY = "settings.gitlabProjectMap";
@@ -15,6 +16,9 @@ const RELEASE_LAST_SEEN_TAG_KEY = "release.lastSeenTag";
 const gitlabMrToggle = document.getElementById("gitlab-mr-toggle");
 const restoreScrollOnReloadToggle = document.getElementById(
   "restore-scroll-on-reload-toggle",
+);
+const shiftHoverSelectionToggle = document.getElementById(
+  "shift-hover-selection-toggle",
 );
 const gitlabMrSettings = document.getElementById("gitlab-mr-settings");
 const gitlabUrlInput = document.getElementById("gitlab-url");
@@ -239,6 +243,7 @@ function readSettings() {
     {
       [GITLAB_MR_FEATURE_KEY]: false,
       [ENHANCED_AGILE_BOARD_FEATURE_KEY]: false,
+      [SHIFT_HOVER_SELECTION_FEATURE_KEY]: false,
       [GITLAB_BASE_URL_KEY]: "",
       [GITLAB_API_KEY_KEY]: "",
       [GITLAB_PROJECT_MAP_KEY]: "",
@@ -247,6 +252,9 @@ function readSettings() {
       gitlabMrToggle.checked = Boolean(result[GITLAB_MR_FEATURE_KEY]);
       restoreScrollOnReloadToggle.checked = Boolean(
         result[ENHANCED_AGILE_BOARD_FEATURE_KEY],
+      );
+      shiftHoverSelectionToggle.checked = Boolean(
+        result[SHIFT_HOVER_SELECTION_FEATURE_KEY],
       );
       setGitlabSettingsVisible(gitlabMrToggle.checked);
       gitlabUrlInput.value = result[GITLAB_BASE_URL_KEY] || "";
@@ -277,6 +285,20 @@ function saveRestoreScrollOnReloadState(enabled) {
       }
 
       browserAPI.storage.local.set({ [ENHANCED_AGILE_BOARD_FEATURE_KEY]: enabled });
+    },
+  );
+}
+
+function saveShiftHoverSelectionState(enabled) {
+  browserAPI.storage.local.get(
+    { [SHIFT_HOVER_SELECTION_FEATURE_KEY]: false },
+    (result) => {
+      const previous = Boolean(result[SHIFT_HOVER_SELECTION_FEATURE_KEY]);
+      if (previous === enabled) {
+        return;
+      }
+
+      browserAPI.storage.local.set({ [SHIFT_HOVER_SELECTION_FEATURE_KEY]: enabled });
     },
   );
 }
@@ -355,6 +377,10 @@ gitlabMrToggle.addEventListener("change", (event) => {
 
 restoreScrollOnReloadToggle.addEventListener("change", (event) => {
   saveRestoreScrollOnReloadState(Boolean(event.target.checked));
+});
+
+shiftHoverSelectionToggle.addEventListener("change", (event) => {
+  saveShiftHoverSelectionState(Boolean(event.target.checked));
 });
 
 saveGitlabSettingsButton.addEventListener("click", saveGitlabSettings);

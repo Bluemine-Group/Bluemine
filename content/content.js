@@ -3,6 +3,8 @@
 const GITLAB_MR_FEATURE_KEY = "feature.gitlabMrStatus.enabled";
 const ENHANCED_AGILE_BOARD_FEATURE_KEY =
   "feature.restoreScrollOnReload.enabled";
+const SHIFT_HOVER_SELECTION_FEATURE_KEY =
+  "feature.shiftHoverSelection.enabled";
 const BOARD_PATH_REGEX = /\/projects\/([^/]+)\/agile\/board\/?$/;
 const SCROLL_RESTORE_STATE_KEY = "bluemine.scrollRestoreState.v1";
 const SCROLL_RESTORE_WAIT_TIMEOUT_MS = 20000;
@@ -2111,10 +2113,46 @@ async function runGitlabMrStatusFeature() {
   }
 }
 
+function runShiftHoverSelectionFeature() {
+  if (!isAgileBoardPage()) return;
+
+  let shiftHeld = false;
+
+  function selectCard(card) {
+    if (!card || card.classList.contains("context-menu-selection")) return;
+    card.classList.add("context-menu-selection");
+    const checkbox = card.querySelector('input[name="ids[]"]');
+    if (checkbox) {
+      checkbox.checked = true;
+      checkbox.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+  }
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Shift") return;
+    shiftHeld = true;
+    selectCard(document.querySelector(".issue-card:hover"));
+  }, { capture: true });
+
+  document.addEventListener("keyup", (e) => {
+    if (e.key === "Shift") shiftHeld = false;
+  }, { capture: true });
+
+  window.addEventListener("blur", () => {
+    shiftHeld = false;
+  });
+
+  document.addEventListener("mouseover", (e) => {
+    if (!shiftHeld) return;
+    selectCard(e.target.closest(".issue-card"));
+  });
+}
+
 browserAPI.storage.local.get(
   {
     [GITLAB_MR_FEATURE_KEY]: false,
     [ENHANCED_AGILE_BOARD_FEATURE_KEY]: false,
+    [SHIFT_HOVER_SELECTION_FEATURE_KEY]: false,
   },
   async (result) => {
     if (result[ENHANCED_AGILE_BOARD_FEATURE_KEY] && isAgileBoardPage()) {
@@ -2134,6 +2172,9 @@ browserAPI.storage.local.get(
       } else {
         removeScrollRestoreOverlayIfReady();
       }
+      if (result[SHIFT_HOVER_SELECTION_FEATURE_KEY] && isAgileBoardPage()) {
+        runShiftHoverSelectionFeature();
+      }
       return;
     }
 
@@ -2152,6 +2193,9 @@ browserAPI.storage.local.get(
       runRestoreScrollOnReloadFeature();
     } else {
       removeScrollRestoreOverlayIfReady();
+    }
+    if (result[SHIFT_HOVER_SELECTION_FEATURE_KEY] && isAgileBoardPage()) {
+      runShiftHoverSelectionFeature();
     }
 
     if (result[GITLAB_MR_FEATURE_KEY]) {
