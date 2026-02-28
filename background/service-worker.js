@@ -231,12 +231,6 @@ function parseProjectMap(rawMap) {
   return map;
 }
 
-function getSettings(defaults) {
-  return new Promise((resolve) => {
-    browserAPI.storage.local.get(defaults, (result) => resolve(result));
-  });
-}
-
 function getLocalSettings(defaults) {
   return new Promise((resolve) => {
     browserAPI.storage.local.get(defaults, (result) => resolve(result));
@@ -262,7 +256,7 @@ function normalizeGitlabBaseUrl(gitlabBaseUrl) {
 }
 
 async function getGitlabProjectSettings(redmineProjectName) {
-  const settings = await getSettings({
+  const settings = await getLocalSettings({
     [GITLAB_MR_FEATURE_KEY]: false,
     [GITLAB_BASE_URL_KEY]: "",
     [GITLAB_API_KEY_KEY]: "",

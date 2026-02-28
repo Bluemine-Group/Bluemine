@@ -22,173 +22,127 @@
   </p>
 </div>
 
-## Table of Contents
+Bluemine is a Manifest V3 browser extension for Chrome and Firefox that enhances Redmine with optional, independently toggleable improvements.
 
-- [About](#about)
-- [Feature Highlights](#feature-highlights)
-- [Architecture](#architecture)
-- [Getting Started](#getting-started)
-- [Configuration](#configuration)
-- [Permissions and Privacy](#permissions-and-privacy)
-- [Build and Release](#build-and-release)
-- [Roadmap](#roadmap)
-- [Contributing](#contributing)
-- [License](#license)
+## Features
 
-## About
+| Feature | What it does |
+| --- | --- |
+| **GitLab MR integration** | Shows merge request status on Agile board cards and issue pages. |
+| **Enhanced Agile board** | Soft-reloads the board in place after actions (preserving scroll), restores collapsed swimlane state across refreshes, and adds a collapse/expand toolbar. |
+| **Shift+Hover selection** | Hold Shift and hover over cards to select them for bulk actions. |
+| **Command Palette** | Keyboard-driven bulk commands on selected cards without leaving the page. |
 
-Bluemine is a Manifest V3 browser extension that enhances Redmine with optional improvements.  
-Every feature is independently toggleable, so teams can enable only what they need.
+## Command Palette
 
-Primary goals:
+Press **Space** while one or more cards are selected (no text input focused). The palette opens with options fetched live from Redmine.
 
-- Improve day-to-day flow in Redmine Agile boards.
-- Surface GitLab MR context where planning and execution happen.
-- Keep credentials local and user-controlled.
-- Stay modular so new features are easy to ship and maintain.
+### Categories
 
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
+| Category | What it does |
+| --- | --- |
+| Status | Change status of selected cards |
+| Assignee | Reassign selected cards |
+| Tracker | Change tracker of selected cards |
+| Target version | Set target version of selected cards |
+| Reviewer | Set reviewer field |
+| Merged | Set merged-by field |
+| Reviewed | Set reviewed-by field |
+| Bulk Edit | Open the Redmine bulk edit form |
+| Copy | Copy selected card IDs to clipboard |
 
-## Feature Highlights
+### Keyboard shortcuts
 
-| Feature | Status | What it does |
-| --- | --- | --- |
-| GitLab MR integration | Available | Shows merge request status directly on Agile board cards/stories. |
-| Enhanced Agile board | Available | Restores scroll position, auto-reloads when navigating back, and preserves collapsed swimlane state. |
-| Release awareness in popup | Available | Highlights when a newer GitHub release is available. |
-| Theme system + dark blue mode | Planned | Introduce visual themes with low-light friendly defaults. |
-| AI task/writing helpers (BYO key) | Planned | Optional AI-assisted task creation and writing support. |
-| Live stale-data/sync background checks | Planned | Warn and sync around stale Agile board state. |
+**Status abbreviations** — type to jump directly to a status:
 
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
+| Shortcut | Status |
+| --- | --- |
+| `cl` | Closed |
+| `new` | New |
+| `ip` | In Progress |
+| `rs` | Resolved |
+| `fb` | Feedback |
+| `rj` | Rejected |
+| `oh` | On Hold |
+| `co` | Confirmed |
 
-## Architecture
+**Category prefixes** — type to filter to a category, then add a space and continue typing to filter by name within it:
 
-High-level structure:
+| Prefix | Category |
+| --- | --- |
+| `as` | Assignee |
+| `re` | Reviewer |
+| `tr` | Tracker |
+| `tv` | Target version |
+| `mg` | Merged |
+| `rd` | Reviewed |
 
-- `content/`: Content scripts that run on Redmine pages and render UI enhancements.
-- `background/`: Service worker for GitLab API calls, caching, and cross-context messaging.
-- `popup/`: Settings UI and feature toggles.
-- `features/`: Feature-level conventions and modularization notes ([README](features/README.md)).
-- `lib/browser-polyfill.js`: Browser API compatibility layer.
+**Person name abbreviation** — first letter of first name + first letter of last name + last letter of last name:
 
-Flow:
+- "Anna Berg" → `abg`
+- "Erik Holm" → `ehm`
 
-1. Content scripts detect relevant Redmine pages.
-2. Feature toggles are read from extension storage.
-3. For GitLab features, content scripts request data from the background worker.
-4. Background worker fetches/caches GitLab data and returns normalized payloads.
-5. UI enhancements are rendered only when their feature is enabled.
+Works standalone or after a category prefix (e.g. `as mak`). Abbreviation matches rank above substring and fuzzy matches.
 
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
+### Navigation
+
+| Key | Action |
+| --- | --- |
+| ↑ / ↓ | Navigate the list |
+| **Tab** | Queue the highlighted command as a chip |
+| **Enter** | Execute the highlighted command (or all queued chips at once) |
+| **Backspace** | Remove last queued chip (when input is empty) |
+| **Escape** | Close without executing |
+
+### Batch mode
+
+Tab queues commands as chips. Multiple commands from different categories are merged into a single request on Enter. Each category allows only one chip at a time — queuing a second command in the same category replaces the first. **Bulk Edit and Copy IDs cannot be chained** with other commands.
 
 ## Getting Started
 
 ### Prerequisites
 
-- Chromium-based browser (Chrome/Edge/Brave) or Firefox (121+).
-- Access to a Redmine instance.
-- Optional: GitLab Personal Access Token for MR integration.
+- Chrome/Edge/Brave or Firefox 121+
+- Access to a Redmine instance
+- Optional: GitLab Personal Access Token for MR integration
 
-### Install from GitHub Actions artifact
+### Install from GitHub Actions
 
 1. Open the [Build workflow runs][build-url].
 2. Download the latest `bluemine-extension-<version>.zip` artifact.
-3. Extract the ZIP.
-4. Load the unpacked extension:
-   - Chrome/Edge: go to `chrome://extensions`, enable **Developer mode**, click **Load unpacked**.
-   - Firefox: go to `about:debugging#/runtime/this-firefox`, click **Load Temporary Add-on**, choose `manifest.json`.
+3. Extract the ZIP and load as an unpacked extension:
+   - **Chrome/Edge**: `chrome://extensions` → Developer mode → Load unpacked
+   - **Firefox**: `about:debugging#/runtime/this-firefox` → Load Temporary Add-on → pick `manifest.json`
 
-### Local development install
-
-1. Clone the repository.
-2. Load it as unpacked extension in your target browser (same steps as above).
-
-No Node.js build step is required for local loading in the current setup.
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
+No build step required.
 
 ## Configuration
 
-Open the extension popup and configure:
+Open the extension popup to configure:
 
-- `GitLab Integration` toggle.
-- `Enhanced Agile board` toggle.
-- `GitLab Base URL` (example: `https://gitlab.example.com`).
-- `GitLab API Key` (`glpat-...`).
-- `Project Mapping` with one line per project:
-
-```txt
-redmine-project-slug=123
-another-project=456
-```
-
-Mapping format is `redmine_project_name=gitlab_project_id`.
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
+- Feature toggles (GitLab MR, Enhanced Agile board, Shift+Hover, Command Palette)
+- GitLab Base URL (`https://gitlab.example.com`)
+- GitLab API Key (`glpat-...`)
+- Project mapping: one `redmine-project-slug=gitlab_project_id` per line
+- Command Palette: Copy IDs separator (default: ` & `)
 
 ## Permissions and Privacy
 
-Manifest permissions used:
+| Permission | Purpose |
+| --- | --- |
+| `storage` | Persist feature toggles and settings locally |
+| `activeTab` | Operate on the current tab |
+| `host_permissions` (`http://*/*`, `https://*/*`) | Support self-hosted Redmine and GitLab instances |
 
-- `storage`: Persist feature toggles and settings locally.
-- `activeTab`: Operate on the current tab context.
-- `host_permissions` on `http://*/*` and `https://*/*`: Support self-hosted/public Redmine and GitLab deployments.
-
-Data handling:
-
-- GitLab credentials are stored in extension local storage.
-- GitLab requests are executed in the background worker.
-- No analytics/telemetry SDKs are included.
-- External network calls are limited to:
-  - Configured GitLab API endpoints (feature-dependent).
-  - GitHub Releases API (popup update indicator).
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
+No analytics or telemetry. External network calls are limited to the configured GitLab API (when enabled) and the GitHub Releases API (popup update indicator).
 
 ## Build and Release
 
-CI/CD is handled by GitHub Actions via [`.github/workflows/build-extension.yml`](.github/workflows/build-extension.yml):
+CI via GitHub Actions ([workflow](.github/workflows/build-extension.yml)):
 
-- Triggered on pushes (all branches), `v*` tags, and manual dispatch.
-- Packages repository files (excluding CI/git/temporary artifacts) into a ZIP.
-- Uploads `bluemine-extension-<version>.zip` as a workflow artifact.
-- `<version>` is the Git tag name on tag builds (for example `v1.2.3`), otherwise the short commit hash.
-- If the run is for a commit that is at `main` HEAD and that commit has a `v*` tag, it also creates a GitHub Release for that tag and attaches the ZIP.
-- Release notes are auto-generated as commit messages since the previous `v*` release tag.
-
-This artifact is the current distribution channel prior to browser store publication.
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-## Roadmap
-
-- Dark mode toggle.
-- Theme switcher with curated light/dark themes.
-- New dark blue theme.
-- Background polling for stale-task warnings.
-- Background sync support for Agile board freshness.
-- AI-assisted task creation (user API key, project-scoped).
-- AI writing support in tasks (user API key, project-scoped).
-- Open selected board tasks in a sidebar.
-
-Track and discuss in [Issues][issues-url].
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-## Contributing
-
-Contributions are welcome.
-
-1. Fork the repository.
-2. Create a feature branch (`git checkout -b feature/your-feature`).
-3. Commit your changes (`git commit -m "feat: add your feature"`).
-4. Push (`git push origin feature/your-feature`).
-5. Open a Pull Request.
-
-Please use [Issues][issues-url] for bug reports, questions, and proposals.
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
+- Triggered on push, `v*` tags, and manual dispatch.
+- Packages the repository and uploads `bluemine-extension-<version>.zip` as a workflow artifact.
+- On tagged commits at `main` HEAD, also creates a GitHub Release with the ZIP attached and auto-generated release notes (commit messages since the previous tag).
 
 ## License
 

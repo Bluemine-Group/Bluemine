@@ -2364,8 +2364,7 @@ function runCommandPaletteFeature(featureResult) {
   }
 
   // Person-name abbreviation: first letter of first name + first letter of
-  // last name + last letter of last name, e.g. "Max Assermark" → "mak",
-  // "Joakim Johansson" → "jjn".
+  // last name + last letter of last name
   function matchesPersonAbbreviation(label, query) {
     const parts = label.trim().split(/\s+/);
     if (parts.length < 2) return false;
@@ -2460,7 +2459,10 @@ function runCommandPaletteFeature(featureResult) {
       const parsed = new URL(patchCmds[0].action.url, window.location.origin);
       for (let i = 1; i < patchCmds.length; i++) {
         try {
-          const other = new URL(patchCmds[i].action.url, window.location.origin);
+          const other = new URL(
+            patchCmds[i].action.url,
+            window.location.origin,
+          );
           for (const [key, val] of other.searchParams) {
             if (key.startsWith("issue[")) {
               parsed.searchParams.append(key, val);
@@ -2993,7 +2995,9 @@ function runNativeContextMenuSoftReload(featureResult) {
   if (!isAgileBoardPage()) return;
 
   const csrfToken = () =>
-    document.querySelector('meta[name="csrf-token"]')?.getAttribute("content") || "";
+    document
+      .querySelector('meta[name="csrf-token"]')
+      ?.getAttribute("content") || "";
 
   function hookLinks(menu) {
     // data-method="patch" identifies the inline action links (status, assignee,

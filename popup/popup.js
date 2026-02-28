@@ -4,6 +4,7 @@ const GITLAB_MR_FEATURE_KEY = "feature.gitlabMrStatus.enabled";
 const ENHANCED_AGILE_BOARD_FEATURE_KEY = "feature.restoreScrollOnReload.enabled";
 const SHIFT_HOVER_SELECTION_FEATURE_KEY = "feature.shiftHoverSelection.enabled";
 const COMMAND_PALETTE_FEATURE_KEY = "feature.commandPalette.enabled";
+const COMMAND_PALETTE_ID_SEPARATOR_KEY = "settings.commandPalette.idSeparator";
 const GITLAB_BASE_URL_KEY = "settings.gitlabBaseUrl";
 const GITLAB_API_KEY_KEY = "settings.gitlabApiKey";
 const GITLAB_PROJECT_MAP_KEY = "settings.gitlabProjectMap";
@@ -22,6 +23,8 @@ const shiftHoverSelectionToggle = document.getElementById(
   "shift-hover-selection-toggle",
 );
 const commandPaletteToggle = document.getElementById("command-palette-toggle");
+const commandPaletteSettings = document.getElementById("command-palette-settings");
+const commandPaletteSeparatorInput = document.getElementById("command-palette-separator");
 const gitlabMrSettings = document.getElementById("gitlab-mr-settings");
 const gitlabUrlInput = document.getElementById("gitlab-url");
 const gitlabApiKeyInput = document.getElementById("gitlab-api-key");
@@ -229,6 +232,11 @@ function setGitlabSettingsVisible(isVisible) {
   gitlabMrSettings.setAttribute("aria-hidden", isVisible ? "false" : "true");
 }
 
+function setCommandPaletteSettingsVisible(isVisible) {
+  commandPaletteSettings.classList.toggle("is-hidden", !isVisible);
+  commandPaletteSettings.setAttribute("aria-hidden", isVisible ? "false" : "true");
+}
+
 function reloadActiveTab() {
   browserAPI.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     const activeTab = tabs && tabs[0];
@@ -247,6 +255,7 @@ function readSettings() {
       [ENHANCED_AGILE_BOARD_FEATURE_KEY]: false,
       [SHIFT_HOVER_SELECTION_FEATURE_KEY]: false,
       [COMMAND_PALETTE_FEATURE_KEY]: false,
+      [COMMAND_PALETTE_ID_SEPARATOR_KEY]: "",
       [GITLAB_BASE_URL_KEY]: "",
       [GITLAB_API_KEY_KEY]: "",
       [GITLAB_PROJECT_MAP_KEY]: "",
@@ -262,7 +271,9 @@ function readSettings() {
       commandPaletteToggle.checked = Boolean(
         result[COMMAND_PALETTE_FEATURE_KEY],
       );
+      commandPaletteSeparatorInput.value = result[COMMAND_PALETTE_ID_SEPARATOR_KEY] || "";
       setGitlabSettingsVisible(gitlabMrToggle.checked);
+      setCommandPaletteSettingsVisible(commandPaletteToggle.checked);
       gitlabUrlInput.value = result[GITLAB_BASE_URL_KEY] || "";
       gitlabApiKeyInput.value = result[GITLAB_API_KEY_KEY] || "";
       projectMapInput.value = result[GITLAB_PROJECT_MAP_KEY] || "";
@@ -321,6 +332,11 @@ function saveCommandPaletteState(enabled) {
       browserAPI.storage.local.set({ [COMMAND_PALETTE_FEATURE_KEY]: enabled }, reloadActiveTab);
     },
   );
+}
+
+function saveCommandPaletteSeparator() {
+  const value = String(commandPaletteSeparatorInput.value);
+  browserAPI.storage.local.set({ [COMMAND_PALETTE_ID_SEPARATOR_KEY]: value });
 }
 
 function saveGitlabSettings() {
@@ -404,8 +420,12 @@ shiftHoverSelectionToggle.addEventListener("change", (event) => {
 });
 
 commandPaletteToggle.addEventListener("change", (event) => {
-  saveCommandPaletteState(Boolean(event.target.checked));
+  const enabled = Boolean(event.target.checked);
+  setCommandPaletteSettingsVisible(enabled);
+  saveCommandPaletteState(enabled);
 });
+
+commandPaletteSeparatorInput.addEventListener("change", saveCommandPaletteSeparator);
 
 saveGitlabSettingsButton.addEventListener("click", saveGitlabSettings);
 

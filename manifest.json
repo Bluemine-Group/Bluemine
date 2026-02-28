@@ -26,16 +26,19 @@
   },
   "content_scripts": [
     {
-      "matches": [
-        "https://*/projects/*/agile/board*",
-        "http://*/projects/*/agile/board*"
-      ],
-      "js": ["lib/browser-polyfill.js", "content/scroll-restore-overlay.js"],
-      "run_at": "document_start"
-    },
-    {
       "matches": ["https://*/*", "http://*/*"],
-      "js": ["lib/browser-polyfill.js", "content/content.js"],
+      "js": [
+        "lib/browser-polyfill.js",
+        "content/constants.js",
+        "content/utils.js",
+        "content/features/enhanced-board.js",
+        "content/features/gitlab-mr.js",
+        "content/features/shift-hover.js",
+        "content/soft-reload.js",
+        "content/features/command-palette.js",
+        "content/features/context-menu.js",
+        "content/index.js"
+      ],
       "run_at": "document_idle"
     }
   ],
