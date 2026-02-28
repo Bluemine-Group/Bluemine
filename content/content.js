@@ -693,6 +693,13 @@ function runCollapsedGroupsFeature() {
   const boardUrl = normalizePageUrl(window.location.href);
   if (!boardUrl) return;
 
+  // The agile plugin focuses #agile_live_search during its own init.
+  // Defer one tick so we run after it, then blur if it's still focused.
+  window.setTimeout(() => {
+    const liveSearch = document.getElementById("agile_live_search");
+    if (liveSearch && document.activeElement === liveSearch) liveSearch.blur();
+  }, 0);
+
   const storageKey = COLLAPSED_GROUPS_SESSION_KEY_PREFIX + boardUrl;
   let isApplyingRestoredState = false;
 
@@ -2225,6 +2232,7 @@ function runCommandPaletteFeature(featureResult) {
   let filteredCommands = [];
   let activeIndex = 0;
   let paletteCSRFToken = "";
+  let queuedCommands = [];
 
   function getSelectedIssueIds() {
     const seen = new Set();
@@ -2363,60 +2371,126 @@ function runCommandPaletteFeature(featureResult) {
     return idx >= 0 ? idx : 0;
   }
 
-  async function softReloadBoard() {
+  async function softReloadBoard(selectedIds) {
     const indicator = document.getElementById("ajax-indicator");
     if (indicator) indicator.style.display = "block";
-
     try {
-      const response = await fetch(window.location.href, {
+      const res = await fetch(window.location.href, {
         credentials: "same-origin",
+        cache: "no-store",
       });
-      if (!response.ok) throw new Error("fetch failed");
+      if (!res.ok) throw new Error("fetch failed");
+      const html = await res.text();
 
-      const html = await response.text();
       const parser = new DOMParser();
-      const newDoc = parser.parseFromString(html, "text/html");
+      const fetchedDoc = parser.parseFromString(html, "text/html");
+      const newTable = fetchedDoc.querySelector("table.issues-board");
+      const curTable = findBoardTable();
+      if (!newTable || !curTable) throw new Error("no agile board table");
 
-      const newContent = newDoc.getElementById("content");
-      const curContent = document.getElementById("content");
+      curTable.innerHTML = newTable.innerHTML;
 
-      if (!newContent || !curContent) {
-        window.location.reload();
-        return;
-      }
+      // The agile plugin's page-init code adds .hascontextmenu to issue cards
+      // at runtime; it's absent from freshly-fetched HTML. Without it,
+      // Redmine's contextMenuRightClick silently exits on every right-click.
+      curTable.querySelectorAll(".issue-card").forEach((card) => {
+        card.classList.add("hascontextmenu");
+      });
 
-      curContent.innerHTML = newContent.innerHTML;
+      // Re-apply the selection that existed before the palette action.
+      selectedIds.forEach((id) => {
+        const card = curTable.querySelector(
+          `.issue-card[data-id="${CSS.escape(id)}"]`,
+        );
+        if (!card || card.classList.contains("context-menu-selection")) return;
+        card.classList.add("context-menu-selection");
+        const cb = card.querySelector('input[name="ids[]"]');
+        if (cb) cb.checked = true;
+      });
 
-      // Re-run features whose DOM lives inside #content and was replaced.
+      // Re-run features that inject DOM into the board.
       if (featureResult[ENHANCED_AGILE_BOARD_FEATURE_KEY]) {
         runCollapsedGroupsFeature();
       }
       if (featureResult[GITLAB_MR_FEATURE_KEY]) {
-        runGitlabMrStatusFeature();
+        await runGitlabMrStatusFeature();
       }
     } catch (_e) {
+      // Any failure falls back to a full page reload.
       window.location.reload();
       return;
-    } finally {
-      // Re-query the DOM — the original element may have been replaced by
-      // the innerHTML swap if #ajax-indicator lives inside #content.
-      const currentIndicator = document.getElementById("ajax-indicator");
-      if (currentIndicator) currentIndicator.style.display = "none";
     }
+    if (indicator) indicator.style.display = "none";
   }
 
-  function reSelectCards(ids) {
-    const idSet = new Set(ids);
-    document.querySelectorAll(".issue-card[data-id]").forEach((card) => {
-      const id = String(card.getAttribute("data-id") || "").trim();
-      if (!idSet.has(id)) return;
-      card.classList.add("context-menu-selection");
-      const checkbox = card.querySelector('input[name="ids[]"]');
-      if (checkbox) {
-        checkbox.checked = true;
-        checkbox.dispatchEvent(new Event("change", { bubbles: true }));
-      }
+  function renderChips() {
+    const row = document.getElementById("bluemine-chip-row");
+    if (!row) return;
+    row.innerHTML = "";
+    queuedCommands.forEach((cmd, i) => {
+      const chip = document.createElement("span");
+      chip.className = "bluemine-chip";
+      const label = document.createElement("span");
+      label.textContent = `${cmd.category}: ${cmd.label}`;
+      const removeBtn = document.createElement("button");
+      removeBtn.className = "bluemine-chip-remove";
+      removeBtn.type = "button";
+      removeBtn.setAttribute("aria-label", "Remove");
+      removeBtn.textContent = "\u00d7";
+      removeBtn.addEventListener("click", () => {
+        queuedCommands.splice(i, 1);
+        renderChips();
+      });
+      chip.appendChild(label);
+      chip.appendChild(removeBtn);
+      row.appendChild(chip);
     });
+  }
+
+  async function executeCommandsBatch(commands, selectedIds) {
+    const patchCmds = commands.filter((c) => c.action?.type === "patch");
+    if (patchCmds.length === 0) return;
+
+    // Single commands work by putting issue[*] params in the URL query string,
+    // not the body. Mirror that: start from the first command's URL (which
+    // already has back_url, ids[], and its own issue[*] param), then append
+    // the issue[*] params from every subsequent command onto the same URL.
+    let mergedUrl;
+    try {
+      const parsed = new URL(patchCmds[0].action.url, window.location.origin);
+      for (let i = 1; i < patchCmds.length; i++) {
+        try {
+          const other = new URL(patchCmds[i].action.url, window.location.origin);
+          for (const [key, val] of other.searchParams) {
+            if (key.startsWith("issue[")) {
+              parsed.searchParams.append(key, val);
+            }
+          }
+        } catch (_e) {
+          // ignore malformed URL
+        }
+      }
+      mergedUrl = parsed.toString();
+    } catch (_e) {
+      mergedUrl = patchCmds[0].action.url;
+    }
+
+    const body = new URLSearchParams();
+    body.append("_method", "patch");
+    body.append("authenticity_token", paletteCSRFToken);
+
+    try {
+      await fetch(mergedUrl, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: body.toString(),
+      });
+    } catch (_e) {
+      // fall through to reload
+    }
+
+    await softReloadBoard(selectedIds);
   }
 
   async function executeCommand(command) {
@@ -2442,11 +2516,10 @@ function runCommandPaletteFeature(featureResult) {
         body: body.toString(),
       });
     } catch (_e) {
-      // fall through to soft-reload
+      // fall through to reload
     }
 
-    await softReloadBoard();
-    reSelectCards(selectedIds);
+    await softReloadBoard(selectedIds);
   }
 
   function renderCommandList() {
@@ -2465,10 +2538,14 @@ function runCommandPaletteFeature(featureResult) {
     listEl.innerHTML = "";
 
     filteredCommands.forEach((cmd, i) => {
+      const isBulkEditBlocked =
+        cmd.category === "Bulk Edit" && queuedCommands.length > 0;
+      const isEffectivelyDisabled = cmd.disabled || isBulkEditBlocked;
+
       const li = document.createElement("li");
       li.className =
         "bluemine-command-item" +
-        (cmd.disabled ? " is-disabled" : "") +
+        (isEffectivelyDisabled ? " is-disabled" : "") +
         (i === activeIndex ? " is-active" : "");
 
       const catSpan = document.createElement("span");
@@ -2482,7 +2559,14 @@ function runCommandPaletteFeature(featureResult) {
       li.appendChild(catSpan);
       li.appendChild(labelSpan);
 
-      if (!cmd.disabled) {
+      if (isBulkEditBlocked) {
+        const hintSpan = document.createElement("span");
+        hintSpan.className = "bluemine-command-hint";
+        hintSpan.textContent = "can\u2019t be chained";
+        li.appendChild(hintSpan);
+      }
+
+      if (!isEffectivelyDisabled) {
         li.addEventListener("mousedown", (e) => {
           e.preventDefault();
           executeCommand(cmd);
@@ -2601,6 +2685,14 @@ function runCommandPaletteFeature(featureResult) {
       .bluemine-command-item.is-active.is-disabled {
         background: #f5f5f5;
       }
+      .bluemine-command-hint {
+        margin-left: auto;
+        font-size: 10px;
+        font-weight: 500;
+        color: #bbb;
+        font-style: italic;
+        white-space: nowrap;
+      }
       .bluemine-command-category {
         font-size: 10px;
         font-weight: 700;
@@ -2629,6 +2721,48 @@ function runCommandPaletteFeature(featureResult) {
         text-align: center;
         letter-spacing: 0.02em;
       }
+      #bluemine-chip-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+        padding: 8px 14px 4px;
+      }
+      #bluemine-chip-row:empty {
+        display: none;
+      }
+      .bluemine-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        background: #eef1ff;
+        color: #3d5afe;
+        border-radius: 6px;
+        padding: 3px 4px 3px 9px;
+        font-size: 12px;
+        font-weight: 600;
+        line-height: 1.4;
+        user-select: none;
+      }
+      .bluemine-chip-remove {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 16px;
+        height: 16px;
+        border: none;
+        background: none;
+        color: #3d5afe;
+        opacity: 0.6;
+        font-size: 14px;
+        line-height: 1;
+        cursor: pointer;
+        padding: 0;
+        border-radius: 3px;
+      }
+      .bluemine-chip-remove:hover {
+        opacity: 1;
+        background: rgba(61, 90, 254, 0.12);
+      }
     `;
     document.head.appendChild(style);
   }
@@ -2646,6 +2780,7 @@ function runCommandPaletteFeature(featureResult) {
     const selectedCount = selectedIds.length;
     overlay.innerHTML = `
       <div id="bluemine-command-palette">
+        <div id="bluemine-chip-row"></div>
         <div id="bluemine-command-input-wrap">
           <input
             id="bluemine-command-input"
@@ -2658,7 +2793,7 @@ function runCommandPaletteFeature(featureResult) {
         </div>
         <ul id="bluemine-command-list"></ul>
         <div id="bluemine-command-status-msg">Loading\u2026</div>
-        <div id="bluemine-command-footer">\u2191\u2193 navigate \u00b7 Enter select \u00b7 Esc close</div>
+        <div id="bluemine-command-footer">\u2191\u2193 navigate \u00b7 Tab queue \u00b7 Enter run \u00b7 Esc close</div>
       </div>
     `;
 
@@ -2703,6 +2838,7 @@ function runCommandPaletteFeature(featureResult) {
     allCommands = [];
     filteredCommands = [];
     activeIndex = 0;
+    queuedCommands = [];
     const overlay = document.getElementById(COMMAND_PALETTE_OVERLAY_ID);
     if (overlay) overlay.remove();
   }
@@ -2729,6 +2865,45 @@ function runCommandPaletteFeature(featureResult) {
         return;
       }
 
+      if (e.key === "Tab") {
+        e.preventDefault();
+        e.stopPropagation();
+        const cmd = filteredCommands[activeIndex];
+        // Only patch-type commands can be batched; skip navigate (Bulk Edit).
+        if (cmd && !cmd.disabled && cmd.action?.type === "patch") {
+          // Replace any existing chip in the same category (e.g. can't set
+          // two statuses), otherwise append.
+          const existingIdx = queuedCommands.findIndex(
+            (c) => c.category === cmd.category,
+          );
+          if (existingIdx >= 0) {
+            queuedCommands[existingIdx] = cmd;
+          } else {
+            queuedCommands.push(cmd);
+          }
+          renderChips();
+          const input = document.getElementById("bluemine-command-input");
+          if (input) input.value = "";
+          filteredCommands = allCommands;
+          activeIndex = getFirstEnabledIndex(filteredCommands);
+          renderCommandList();
+        }
+        return;
+      }
+
+      if (e.key === "Backspace") {
+        const input = document.getElementById("bluemine-command-input");
+        if (input && input.value === "" && queuedCommands.length > 0) {
+          e.preventDefault();
+          queuedCommands.pop();
+          renderChips();
+          filteredCommands = allCommands;
+          activeIndex = getFirstEnabledIndex(filteredCommands);
+          renderCommandList();
+        }
+        return;
+      }
+
       if (e.key === "ArrowDown") {
         e.preventDefault();
         if (activeIndex < filteredCommands.length - 1) activeIndex++;
@@ -2745,8 +2920,16 @@ function runCommandPaletteFeature(featureResult) {
 
       if (e.key === "Enter") {
         e.preventDefault();
-        const cmd = filteredCommands[activeIndex];
-        if (cmd) executeCommand(cmd);
+        if (queuedCommands.length > 0) {
+          // Execute all queued chips in one merged request.
+          const toExecute = [...queuedCommands];
+          const selectedIds = getSelectedIssueIds();
+          closePalette();
+          executeCommandsBatch(toExecute, selectedIds);
+        } else {
+          const cmd = filteredCommands[activeIndex];
+          if (cmd) executeCommand(cmd);
+        }
         return;
       }
     },
