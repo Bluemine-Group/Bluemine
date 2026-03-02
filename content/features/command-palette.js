@@ -703,10 +703,8 @@ function runCommandPaletteFeature(featureResult) {
           const toExecute = [...queuedCommands];
           const activeCmd = filteredCommands[activeIndex];
           if (activeCmd && !activeCmd.disabled && activeCmd.action?.type === "patch") {
-            const existingIdx = toExecute.findIndex((c) => c.category === activeCmd.category);
-            if (existingIdx >= 0) {
-              toExecute[existingIdx] = activeCmd;
-            } else {
+            const alreadyQueued = toExecute.some((c) => c.category === activeCmd.category);
+            if (!alreadyQueued) {
               toExecute.push(activeCmd);
             }
           }
