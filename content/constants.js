@@ -36,7 +36,8 @@ const COMMAND_PALETTE_STATUS_SHORTCUTS = {
   co: "confirmed",
 };
 const BOARD_PATH_REGEX = /\/projects\/([^/]+)\/agile\/board\/?$/;
-const MR_TITLE_PREFIX_REGEX = /^(\d{5}(?:\s*[^\d\s]\s*\d{5})*) - /;
+const MR_TITLE_PREFIX_REGEX =
+  /^(?:draft\s*:\s*)?(\d{5}(?:\s*[^\d\s]\s*\d{5})*) - /i;
 const MR_CONTAINER_CLASS = "bluemine-mr-status";
 const MR_STYLE_ID = "bluemine-mr-status-style";
 const MR_ATTRIBUTE_LINE_CLASS = "bluemine-gitlab-attribute-line";
@@ -54,4 +55,3 @@ const COLLAPSED_GROUPS_SESSION_KEY_PREFIX = "bluemine.collapsedGroups.v1.";
 const COLLAPSED_GROUP_NONE_ID = "__none__";
 const SWIMLANE_TOOLBAR_ID = "bluemine-swimlane-toolbar";
 const SWIMLANE_TOOLBAR_STYLE_ID = "bluemine-swimlane-toolbar-style";
-

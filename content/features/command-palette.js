@@ -33,6 +33,108 @@ function runCommandPaletteFeature(featureResult) {
     return `/issues/bulk_edit?${params}`;
   }
 
+  function sendRuntimeMessage(message) {
+    return new Promise((resolve) => {
+      browserAPI.runtime.sendMessage(message, (response) => {
+        if (browserAPI.runtime.lastError) {
+          resolve({
+            ok: false,
+            error:
+              browserAPI.runtime.lastError.message ||
+              "Extension request failed",
+          });
+          return;
+        }
+
+        resolve(response || { ok: false, error: "No extension response" });
+      });
+    });
+  }
+
+  function extractIssueTitleFromDocument(doc, issueId) {
+    const subject =
+      doc.querySelector(".issue .subject h3") ||
+      doc.querySelector(".issue .subject") ||
+      doc.querySelector("#content h2") ||
+      doc.querySelector("h2");
+    const rawSubject = String(subject?.textContent || "").trim();
+    if (rawSubject) {
+      return rawSubject
+        .replace(new RegExp(`^#?${issueId}\\s*[:\\-]?\\s*`), "")
+        .trim();
+    }
+
+    return "";
+  }
+
+  function extractIssueDescriptionFromDocument(doc) {
+    const description =
+      doc.querySelector(".issue .description .wiki") ||
+      doc.querySelector(".description .wiki") ||
+      doc.querySelector(".issue .description");
+    return String(description?.textContent || "")
+      .replace(/\s+\n/g, "\n")
+      .trim();
+  }
+
+  function extractIssueTitleFromCard(issueId) {
+    const card = document.querySelector(
+      `.issue-card[data-id="${CSS.escape(issueId)}"]`,
+    );
+    if (!card) return "";
+
+    const titleNode =
+      card.querySelector("p.name a") ||
+      card.querySelector(".name a") ||
+      card.querySelector(".issue-subject") ||
+      card.querySelector("a[href*='/issues/']");
+    const rawTitle = String(
+      titleNode?.textContent || card.textContent || "",
+    ).trim();
+    return rawTitle
+      .replace(new RegExp(`^#?${issueId}\\s*[:\\-]?\\s*`), "")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  async function fetchIssuePromptDetails(issueId) {
+    let title = extractIssueTitleFromCard(issueId);
+    let description = "";
+
+    try {
+      const response = await fetch(`/issues/${encodeURIComponent(issueId)}`, {
+        credentials: "same-origin",
+      });
+      if (response.ok) {
+        const html = await response.text();
+        const doc = new DOMParser().parseFromString(html, "text/html");
+        title = extractIssueTitleFromDocument(doc, issueId) || title;
+        description = extractIssueDescriptionFromDocument(doc);
+      }
+    } catch (_error) {
+      // Card title fallback is enough to keep dispatch usable.
+    }
+
+    const promptParts = [title, description].filter(Boolean);
+    return {
+      title: title || `Task ${issueId}`,
+      description,
+      prompt:
+        promptParts.length > 0 ? promptParts.join("\n\n") : `Task ${issueId}`,
+    };
+  }
+
+  async function dispatchIssueToClaude(issueId) {
+    const issueDetails = await fetchIssuePromptDetails(issueId);
+    return sendRuntimeMessage({
+      type: "BLUEMINE_DISPATCH_TO_CLAUDE",
+      redmineProjectName: getCurrentBoardProjectName(),
+      issueId,
+      issueTitle: issueDetails.title,
+      issuePrompt: issueDetails.prompt,
+    });
+  }
+
   async function fetchContextMenuHtml(issueIds) {
     const params = new URLSearchParams();
     for (const id of issueIds) params.append("ids[]", id);
@@ -164,7 +266,9 @@ function runCommandPaletteFeature(featureResult) {
 
   function isBlockedCmd(cmd) {
     return (
-      (cmd.category === "Bulk Edit" || cmd.category === "Copy") &&
+      (cmd.category === "Bulk Edit" ||
+        cmd.category === "Copy" ||
+        cmd.category === "AI") &&
       queuedCommands.length > 0
     );
   }
@@ -269,6 +373,36 @@ function runCommandPaletteFeature(featureResult) {
     }
 
     const selectedIds = getSelectedIssueIds();
+    if (command.action.type === "dispatchClaude") {
+      const dispatchFailures = [];
+      for (let index = 0; index < selectedIds.length; index += 1) {
+        const issueId = selectedIds[index];
+        setCommandPaletteStatus(
+          `Dispatching to Claude ${index + 1}/${selectedIds.length}...`,
+        );
+        const response = await dispatchIssueToClaude(issueId);
+        if (!response?.ok) {
+          dispatchFailures.push({
+            issueId,
+            error: response?.error || "Could not dispatch task to Claude",
+          });
+        }
+      }
+
+      if (dispatchFailures.length > 0) {
+        closePalette();
+        window.alert(
+          dispatchFailures
+            .map((failure) => `#${failure.issueId}: ${failure.error}`)
+            .join("\n"),
+        );
+        return;
+      }
+
+      closePalette();
+      return;
+    }
+
     closePalette();
 
     if (command.action.type === "navigate") {
@@ -586,13 +720,29 @@ function runCommandPaletteFeature(featureResult) {
     if (input) input.focus();
 
     fetchContextMenuHtml(selectedIds)
-      .then((html) => {
+      .then(async (html) => {
         if (!isOpen) return;
         if (!html) {
           setCommandPaletteStatus("Could not load options");
           return;
         }
         const parsed = parseContextMenuCommands(html);
+        const claudeReadyResponse = await sendRuntimeMessage({
+          type: "BLUEMINE_IS_CLAUDE_DISPATCH_READY",
+          redmineProjectName: getCurrentBoardProjectName(),
+        });
+        if (!isOpen) return;
+        const claudeDispatchCommands = claudeReadyResponse?.isReady
+          ? [
+              {
+                id: "dispatch-to-claude",
+                category: "AI",
+                label: "Dispatch to Claude the intern",
+                disabled: selectedIds.length === 0,
+                action: { type: "dispatchClaude" },
+              },
+            ]
+          : [];
         allCommands = [
           {
             id: "copy-ids",
@@ -608,6 +758,7 @@ function runCommandPaletteFeature(featureResult) {
             disabled: false,
             action: { type: "navigate", url: buildBulkEditUrl(selectedIds) },
           },
+          ...claudeDispatchCommands,
           ...parsed,
         ];
         filteredCommands = allCommands;

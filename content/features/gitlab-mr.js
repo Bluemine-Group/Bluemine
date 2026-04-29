@@ -1,5 +1,220 @@
-function mapMrState(state) {
+const CLAUDE_DRAFT_WORDS = [
+  "Accomplishing",
+  "Actioning",
+  "Actualizing",
+  "Architecting",
+  "Baking",
+  "Beaming",
+  "Beboppin'",
+  "Befuddling",
+  "Billowing",
+  "Blanching",
+  "Bloviating",
+  "Boogieing",
+  "Boondoggling",
+  "Booping",
+  "Bootstrapping",
+  "Brewing",
+  "Bunning",
+  "Burrowing",
+  "Calculating",
+  "Canoodling",
+  "Caramelizing",
+  "Cascading",
+  "Catapulting",
+  "Cerebrating",
+  "Channeling",
+  "Channelling",
+  "Choreographing",
+  "Churning",
+  "Clauding",
+  "Coalescing",
+  "Cogitating",
+  "Combobulating",
+  "Composing",
+  "Computing",
+  "Concocting",
+  "Considering",
+  "Contemplating",
+  "Cooking",
+  "Crafting",
+  "Creating",
+  "Crunching",
+  "Crystallizing",
+  "Cultivating",
+  "Deciphering",
+  "Deliberating",
+  "Determining",
+  "Dilly-dallying",
+  "Discombobulating",
+  "Doing",
+  "Doodling",
+  "Drizzling",
+  "Ebbing",
+  "Effecting",
+  "Elucidating",
+  "Embellishing",
+  "Enchanting",
+  "Envisioning",
+  "Evaporating",
+  "Fermenting",
+  "Fiddle-faddling",
+  "Finagling",
+  "Flamb\u00e9ing",
+  "Flibbertigibbeting",
+  "Flowing",
+  "Flummoxing",
+  "Fluttering",
+  "Forging",
+  "Forming",
+  "Frolicking",
+  "Frosting",
+  "Gallivanting",
+  "Galloping",
+  "Garnishing",
+  "Generating",
+  "Gesticulating",
+  "Germinating",
+  "Gitifying",
+  "Grooving",
+  "Gusting",
+  "Harmonizing",
+  "Hashing",
+  "Hatching",
+  "Herding",
+  "Honking",
+  "Hullaballooing",
+  "Hyperspacing",
+  "Ideating",
+  "Imagining",
+  "Improvising",
+  "Incubating",
+  "Inferring",
+  "Infusing",
+  "Ionizing",
+  "Jitterbugging",
+  "Julienning",
+  "Kneading",
+  "Leavening",
+  "Levitating",
+  "Lollygagging",
+  "Manifesting",
+  "Marinating",
+  "Meandering",
+  "Metamorphosing",
+  "Misting",
+  "Moonwalking",
+  "Moseying",
+  "Mulling",
+  "Mustering",
+  "Musing",
+  "Nebulizing",
+  "Nesting",
+  "Newspapering",
+  "Noodling",
+  "Nucleating",
+  "Orbiting",
+  "Orchestrating",
+  "Osmosing",
+  "Perambulating",
+  "Percolating",
+  "Perusing",
+  "Philosophising",
+  "Photosynthesizing",
+  "Pollinating",
+  "Pondering",
+  "Pontificating",
+  "Pouncing",
+  "Precipitating",
+  "Prestidigitating",
+  "Processing",
+  "Proofing",
+  "Propagating",
+  "Puttering",
+  "Puzzling",
+  "Quantumizing",
+  "Razzle-dazzling",
+  "Razzmatazzing",
+  "Recombobulating",
+  "Reticulating",
+  "Roosting",
+  "Ruminating",
+  "Saut\u00e9ing",
+  "Scampering",
+  "Schlepping",
+  "Scurrying",
+  "Seasoning",
+  "Shenaniganing",
+  "Shimmying",
+  "Simmering",
+  "Skedaddling",
+  "Sketching",
+  "Slithering",
+  "Smooshing",
+  "Sock-hopping",
+  "Spelunking",
+  "Spinning",
+  "Sprouting",
+  "Stewing",
+  "Sublimating",
+  "Swirling",
+  "Swooping",
+  "Symbioting",
+  "Synthesizing",
+  "Tempering",
+  "Thinking",
+  "Thundering",
+  "Tinkering",
+  "Tomfoolering",
+  "Topsy-turvying",
+  "Transfiguring",
+  "Transmuting",
+  "Twisting",
+  "Undulating",
+  "Unfurling",
+  "Unravelling",
+  "Vibing",
+  "Waddling",
+  "Wandering",
+  "Warping",
+  "Whatchamacalliting",
+  "Whirlpooling",
+  "Whirring",
+  "Whisking",
+  "Wibbling",
+  "Working",
+  "Wrangling",
+  "Zesting",
+  "Zigzagging",
+];
+const _claudeDraftWordByMergeRequestKey = new Map();
+
+function getClaudeDraftWord(mergeRequest) {
+  const key =
+    String(mergeRequest?.url || "").trim() ||
+    String(mergeRequest?.web_url || "").trim() ||
+    String(mergeRequest?.iid || "").trim() ||
+    String(Math.random());
+  if (_claudeDraftWordByMergeRequestKey.has(key)) {
+    return _claudeDraftWordByMergeRequestKey.get(key);
+  }
+
+  const word =
+    CLAUDE_DRAFT_WORDS[Math.floor(Math.random() * CLAUDE_DRAFT_WORDS.length)] ||
+    "Working";
+  _claudeDraftWordByMergeRequestKey.set(key, word);
+  return word;
+}
+
+function mapMrState(state, options = {}) {
   if (state === "opened") {
+    if (options.isDraft) {
+      return {
+        label: getClaudeDraftWord(options.mergeRequest) + "...",
+        className: "is-claude-draft",
+      };
+    }
+
     return { label: "Open", className: "is-open" };
   }
 
@@ -108,6 +323,12 @@ function ensureMrStylesInjected() {
     .${MR_CONTAINER_CLASS} .bluemine-mr-link.is-open {
       background: #edf4ff;
       color: #184f95;
+    }
+
+    .${MR_CONTAINER_CLASS} .bluemine-mr-link.is-claude-draft {
+      background: #fff3e6;
+      color: #f97316;
+      border-color: rgba(249, 115, 22, 0.42);
     }
 
     .${MR_CONTAINER_CLASS} .bluemine-mr-link.is-merged {
@@ -292,7 +513,10 @@ function getResolvedCounts(mergeRequest) {
 
 function getMergeRequestStatusLabel(mergeRequest) {
   const stateLabel = String(mergeRequest?.stateLabel || "").trim() || "Unknown";
-  if (mergeRequest?.stateClassName !== "is-open") {
+  if (
+    mergeRequest?.stateClassName !== "is-open" &&
+    mergeRequest?.stateClassName !== "is-claude-draft"
+  ) {
     return stateLabel;
   }
 
@@ -344,9 +568,14 @@ function buildIssueMrMap(mergeRequests) {
       continue;
     }
 
-    const state = mapMrState(mergeRequest.state);
+    const state = mapMrState(mergeRequest.state, {
+      isDraft: Boolean(mergeRequest.draft),
+      mergeRequest,
+    });
     const reviewers = normalizeReviewerList(mergeRequest.reviewers);
     const mergeRequestEntry = {
+      iid: String(mergeRequest.iid || "").trim(),
+      isDraft: Boolean(mergeRequest.draft),
       stateLabel: state.label,
       stateClassName: state.className,
       url: String(mergeRequest.web_url || "").trim(),
@@ -464,6 +693,7 @@ function buildMergeRequestRenderSignaturePayload(relatedMergeRequests) {
     stateLabel: String(mergeRequest?.stateLabel || ""),
     stateClassName: String(mergeRequest?.stateClassName || ""),
     url: String(mergeRequest?.url || ""),
+    isDraft: Boolean(mergeRequest?.isDraft),
     hasReviewer: Boolean(mergeRequest?.hasReviewer),
     isApproved: Boolean(mergeRequest?.isApproved),
     unresolvedComments: toNonNegativeNumber(mergeRequest?.unresolvedComments),
@@ -1375,10 +1605,7 @@ async function runGitlabMrStatusFeature(options = {}) {
     const avatarRequestMetrics = await avatarMetricsPromise;
     mergeGitlabRequestMetrics(requestMetricsSummary, avatarRequestMetrics);
   } catch (error) {
-    console.warn(
-      "[Bluemine] Failed to apply GitLab assignee avatars:",
-      error,
-    );
+    console.warn("[Bluemine] Failed to apply GitLab assignee avatars:", error);
   }
 
   startCardObserverForDragDrop(boardProjectName);

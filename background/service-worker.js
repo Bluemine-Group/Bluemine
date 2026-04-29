@@ -47,12 +47,17 @@ browserAPI.runtime.onInstalled.addListener((details) => {
 const GITLAB_BASE_URL_KEY = "settings.gitlabBaseUrl";
 const GITLAB_API_KEY_KEY = "settings.gitlabApiKey";
 const GITLAB_PROJECT_MAP_KEY = "settings.gitlabProjectMap";
+const CLAUDE_DISPATCH_PIPELINE_EXECUTION_URL_KEY =
+  "settings.claudeDispatch.pipelineExecutionUrl";
+const CLAUDE_DISPATCH_TRIGGER_TOKEN_KEY =
+  "settings.claudeDispatch.triggerToken";
 const GITLAB_MR_FEATURE_KEY = "feature.gitlabMrStatus.enabled";
 const GITLAB_MR_CACHE_KEY = "cache.gitlabMergeRequests.v1";
 const GITLAB_AVATAR_CACHE_KEY = "cache.gitlabAssigneeAvatars.v1";
 const GITLAB_ASSIGNEE_NAME_CACHE_KEY = "cache.gitlabAssigneeNameAvatars.v1";
 const GITLAB_AVATAR_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
-const MR_TITLE_PREFIX_REGEX = /^(\d{5}(?:\s*[^\d\s]\s*\d{5})*) - /;
+const MR_TITLE_PREFIX_REGEX =
+  /^(?:draft\s*:\s*)?(\d{5}(?:\s*[^\d\s]\s*\d{5})*) - /i;
 const redmineTabDetection = new Map();
 
 function createGitlabRequestMetrics() {
@@ -122,6 +127,58 @@ browserAPI.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       })
       .catch((_error) => {
         sendResponse({ ok: true, isReady: false });
+      });
+
+    return true;
+  }
+
+  if (message?.type === "BLUEMINE_IS_CLAUDE_DISPATCH_READY") {
+    const redmineProjectName = String(message.redmineProjectName || "").trim();
+    if (!redmineProjectName) {
+      sendResponse({ ok: true, isReady: false });
+      return;
+    }
+
+    getClaudeDispatchSettings(redmineProjectName)
+      .then((settings) => {
+        sendResponse({ ok: true, isReady: Boolean(settings) });
+      })
+      .catch((_error) => {
+        sendResponse({ ok: true, isReady: false });
+      });
+
+    return true;
+  }
+
+  if (message?.type === "BLUEMINE_DISPATCH_TO_CLAUDE") {
+    const redmineProjectName = String(message.redmineProjectName || "").trim();
+    const issueId = String(message.issueId || "").trim();
+    const issueTitle = String(message.issueTitle || "").trim();
+    const issuePrompt = String(message.issuePrompt || "").trim();
+    if (!redmineProjectName) {
+      sendResponse({ ok: false, error: "Missing Redmine project name" });
+      return;
+    }
+    if (!/^\d+$/.test(issueId)) {
+      sendResponse({ ok: false, error: "Missing task id" });
+      return;
+    }
+
+    dispatchTaskToClaude({
+      redmineProjectName,
+      issueId,
+      issueTitle,
+      issuePrompt,
+    })
+      .then((result) => {
+        sendResponse({ ok: true, ...result });
+      })
+      .catch((error) => {
+        sendResponse({
+          ok: false,
+          error: error.message || "Could not dispatch task to Claude",
+          status: Number(error.status) || undefined
+        });
       });
 
     return true;
@@ -255,6 +312,19 @@ function normalizeGitlabBaseUrl(gitlabBaseUrl) {
   }
 }
 
+function normalizePipelineExecutionUrl(pipelineExecutionUrl) {
+  try {
+    const parsed = new URL(pipelineExecutionUrl);
+    parsed.pathname = parsed.pathname.replace(/\/+$/, "");
+    parsed.hash = "";
+    return parsed.toString();
+  } catch (_error) {
+    const invalidUrlError = new Error("Invalid pipeline execution URL");
+    invalidUrlError.status = 400;
+    throw invalidUrlError;
+  }
+}
+
 async function getGitlabProjectSettings(redmineProjectName) {
   const settings = await getLocalSettings({
     [GITLAB_MR_FEATURE_KEY]: false,
@@ -279,6 +349,72 @@ async function getGitlabProjectSettings(redmineProjectName) {
     normalizedBaseUrl: normalizeGitlabBaseUrl(gitlabBaseUrl),
     apiKey,
     gitlabProjectId
+  };
+}
+
+async function getClaudeDispatchSettings(redmineProjectName) {
+  const settings = await getLocalSettings({
+    [CLAUDE_DISPATCH_PIPELINE_EXECUTION_URL_KEY]: "",
+    [CLAUDE_DISPATCH_TRIGGER_TOKEN_KEY]: "",
+  });
+
+  const pipelineExecutionUrl = String(
+    settings[CLAUDE_DISPATCH_PIPELINE_EXECUTION_URL_KEY] || "",
+  ).trim();
+  const triggerToken = String(
+    settings[CLAUDE_DISPATCH_TRIGGER_TOKEN_KEY] || "",
+  ).trim();
+  if (!pipelineExecutionUrl || !triggerToken || !redmineProjectName) {
+    return null;
+  }
+
+  return {
+    pipelineExecutionUrl: normalizePipelineExecutionUrl(pipelineExecutionUrl),
+    triggerToken,
+  };
+}
+
+async function dispatchTaskToClaude({
+  redmineProjectName,
+  issueId,
+  issueTitle,
+  issuePrompt,
+}) {
+  const dispatchSettings = await getClaudeDispatchSettings(redmineProjectName);
+  if (!dispatchSettings) {
+    const missingSettingsError = new Error(
+      "Claude dispatch is not configured for this Redmine project",
+    );
+    missingSettingsError.status = 400;
+    throw missingSettingsError;
+  }
+
+  const form = new FormData();
+  form.append("token", dispatchSettings.triggerToken);
+  form.append("ref", "main");
+  form.append("variables[REDMINE_PROJECT]", redmineProjectName);
+  form.append("variables[TASK_ID]", issueId);
+  form.append("variables[TASK_TITLE]", issueTitle || `Task ${issueId}`);
+  form.append("variables[PROMPT]", issuePrompt || issueTitle || `Task ${issueId}`);
+
+  const response = await fetch(dispatchSettings.pipelineExecutionUrl, {
+    method: "POST",
+    body: form,
+  });
+
+  if (!response.ok) {
+    const responseText = await response.text().catch(() => "");
+    const error = new Error(
+      `Claude dispatch failed (${response.status})${responseText ? `: ${responseText}` : ""}`,
+    );
+    error.status = response.status;
+    throw error;
+  }
+
+  const payload = await response.json().catch(() => ({}));
+  return {
+    pipelineId: payload?.id,
+    pipelineUrl: payload?.web_url,
   };
 }
 
@@ -409,6 +545,7 @@ function sanitizeMergeRequestForCache(mergeRequest, issueIdSet) {
     iid: String(mergeRequest?.iid || "").trim(),
     issueIds,
     state: String(mergeRequest?.state || "").trim() || "unknown",
+    draft: Boolean(mergeRequest?.draft || mergeRequest?.work_in_progress),
     web_url: String(mergeRequest?.web_url || "").trim(),
     reviewers,
     approved: Boolean(mergeRequest?.approved),

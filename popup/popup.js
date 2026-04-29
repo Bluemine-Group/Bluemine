@@ -8,6 +8,10 @@ const COMMAND_PALETTE_ID_SEPARATOR_KEY = "settings.commandPalette.idSeparator";
 const GITLAB_BASE_URL_KEY = "settings.gitlabBaseUrl";
 const GITLAB_API_KEY_KEY = "settings.gitlabApiKey";
 const GITLAB_PROJECT_MAP_KEY = "settings.gitlabProjectMap";
+const CLAUDE_DISPATCH_PIPELINE_EXECUTION_URL_KEY =
+  "settings.claudeDispatch.pipelineExecutionUrl";
+const CLAUDE_DISPATCH_TRIGGER_TOKEN_KEY =
+  "settings.claudeDispatch.triggerToken";
 const GITHUB_REPO_URL = "https://github.com/webjocke/Bluemine";
 const GITHUB_RELEASES_URL = `${GITHUB_REPO_URL}/releases`;
 const GITHUB_LATEST_RELEASE_URL =
@@ -32,16 +36,30 @@ const projectMapInput = document.getElementById("project-map");
 const saveGitlabSettingsButton = document.getElementById(
   "save-gitlab-settings",
 );
+const claudePipelineUrlInput = document.getElementById("claude-pipeline-url");
+const claudeTriggerTokenInput = document.getElementById("claude-trigger-token");
+const saveClaudeSettingsButton = document.getElementById(
+  "save-claude-settings",
+);
 const status = document.getElementById("status");
+const claudeStatus = document.getElementById("claude-status");
 const githubLink = document.getElementById("github-link");
 
-function setStatus(message) {
-  status.textContent = message;
+function setTimedStatus(statusElement, message) {
+  statusElement.textContent = message;
   window.setTimeout(() => {
-    if (status.textContent === message) {
-      status.textContent = "";
+    if (statusElement.textContent === message) {
+      statusElement.textContent = "";
     }
   }, 1500);
+}
+
+function setStatus(message) {
+  setTimedStatus(status, message);
+}
+
+function setClaudeStatus(message) {
+  setTimedStatus(claudeStatus, message);
 }
 
 function normalizeReleaseTag(rawTag) {
@@ -194,6 +212,18 @@ function normalizeBaseUrl(raw) {
   return `${parsed.origin}${path}`;
 }
 
+function normalizePipelineExecutionUrl(raw) {
+  const value = String(raw || "").trim();
+  if (!value) {
+    return "";
+  }
+
+  const parsed = new URL(value);
+  parsed.pathname = parsed.pathname.replace(/\/+$/, "");
+  parsed.hash = "";
+  return parsed.toString();
+}
+
 function parseProjectMap(rawMap) {
   const lines = String(rawMap || "").split(/\r?\n/);
   const validLines = [];
@@ -259,6 +289,8 @@ function readSettings() {
       [GITLAB_BASE_URL_KEY]: "",
       [GITLAB_API_KEY_KEY]: "",
       [GITLAB_PROJECT_MAP_KEY]: "",
+      [CLAUDE_DISPATCH_PIPELINE_EXECUTION_URL_KEY]: "",
+      [CLAUDE_DISPATCH_TRIGGER_TOKEN_KEY]: "",
     },
     (result) => {
       gitlabMrToggle.checked = Boolean(result[GITLAB_MR_FEATURE_KEY]);
@@ -277,6 +309,10 @@ function readSettings() {
       gitlabUrlInput.value = result[GITLAB_BASE_URL_KEY] || "";
       gitlabApiKeyInput.value = result[GITLAB_API_KEY_KEY] || "";
       projectMapInput.value = result[GITLAB_PROJECT_MAP_KEY] || "";
+      claudePipelineUrlInput.value =
+        result[CLAUDE_DISPATCH_PIPELINE_EXECUTION_URL_KEY] || "";
+      claudeTriggerTokenInput.value =
+        result[CLAUDE_DISPATCH_TRIGGER_TOKEN_KEY] || "";
     },
   );
 }
@@ -405,6 +441,56 @@ function saveGitlabSettings() {
   }
 }
 
+function saveClaudeSettings() {
+  try {
+    const normalizedPipelineExecutionUrl = normalizePipelineExecutionUrl(
+      claudePipelineUrlInput.value,
+    );
+    const triggerToken = String(claudeTriggerTokenInput.value || "").trim();
+
+    browserAPI.storage.local.get(
+      {
+        [CLAUDE_DISPATCH_PIPELINE_EXECUTION_URL_KEY]: "",
+        [CLAUDE_DISPATCH_TRIGGER_TOKEN_KEY]: "",
+      },
+      (result) => {
+        const previousUrl = String(
+          result[CLAUDE_DISPATCH_PIPELINE_EXECUTION_URL_KEY] || "",
+        );
+        const previousTriggerToken = String(
+          result[CLAUDE_DISPATCH_TRIGGER_TOKEN_KEY] || "",
+        );
+
+        const hasChanges =
+          previousUrl !== normalizedPipelineExecutionUrl ||
+          previousTriggerToken !== triggerToken;
+
+        if (!hasChanges) {
+          setClaudeStatus("No changes to save");
+          return;
+        }
+
+        browserAPI.storage.local.set(
+          {
+            [CLAUDE_DISPATCH_PIPELINE_EXECUTION_URL_KEY]:
+              normalizedPipelineExecutionUrl,
+            [CLAUDE_DISPATCH_TRIGGER_TOKEN_KEY]: triggerToken,
+          },
+          () => {
+            claudePipelineUrlInput.value = normalizedPipelineExecutionUrl;
+            claudeTriggerTokenInput.value = triggerToken;
+
+            setClaudeStatus("Claude settings saved");
+            reloadActiveTab();
+          },
+        );
+      },
+    );
+  } catch (_error) {
+    setClaudeStatus("Invalid URL");
+  }
+}
+
 gitlabMrToggle.addEventListener("change", (event) => {
   const enabled = Boolean(event.target.checked);
   setGitlabSettingsVisible(enabled);
@@ -428,6 +514,7 @@ commandPaletteToggle.addEventListener("change", (event) => {
 commandPaletteSeparatorInput.addEventListener("change", saveCommandPaletteSeparator);
 
 saveGitlabSettingsButton.addEventListener("click", saveGitlabSettings);
+saveClaudeSettingsButton.addEventListener("click", saveClaudeSettings);
 
 gitlabUrlInput.addEventListener("keydown", (event) => {
   if (event.key === "Enter") {
@@ -441,6 +528,18 @@ gitlabApiKeyInput.addEventListener("keydown", (event) => {
     event.preventDefault();
     saveGitlabSettings();
   }
+});
+
+[
+  claudePipelineUrlInput,
+  claudeTriggerTokenInput,
+].forEach((input) => {
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      saveClaudeSettings();
+    }
+  });
 });
 
 readSettings();

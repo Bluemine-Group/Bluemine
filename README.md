@@ -28,10 +28,10 @@ Bluemine is a Manifest V3 browser extension for Chrome and Firefox that enhances
 
 ### Install
 
-| Browser | Link |
-| --- | --- |
-| **Firefox** | [Firefox Add-ons — Bluemine](https://addons.mozilla.org/en-US/firefox/addon/bluemine/) |
-| **Chrome / Edge / Brave** | Install from the [latest GitHub Release][release-url] (see below) |
+| Browser                   | Link                                                                                   |
+| ------------------------- | -------------------------------------------------------------------------------------- |
+| **Firefox**               | [Firefox Add-ons — Bluemine](https://addons.mozilla.org/en-US/firefox/addon/bluemine/) |
+| **Chrome / Edge / Brave** | Install from the [latest GitHub Release][release-url] (see below)                      |
 
 ### Install from GitHub Release (Chrome/Edge/Brave)
 
@@ -57,12 +57,12 @@ No build step required.
 
 ## Features
 
-| Feature | What it does |
-| --- | --- |
-| **GitLab MR integration** | Shows merge request status on Agile board cards and issue pages. |
-| **Enhanced Agile board** | Soft-reloads the board in place after actions (preserving scroll), restores collapsed swimlane state across refreshes, and adds a collapse/expand toolbar. |
-| **Shift+Hover selection** | Hold Shift and hover over cards to select them for bulk actions. |
-| **Command Palette** | Keyboard-driven bulk commands on selected cards without leaving the page. |
+| Feature                   | What it does                                                                                                                                               |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **GitLab MR integration** | Shows merge request status on Agile board cards and issue pages.                                                                                           |
+| **Enhanced Agile board**  | Soft-reloads the board in place after actions (preserving scroll), restores collapsed swimlane state across refreshes, and adds a collapse/expand toolbar. |
+| **Shift+Hover selection** | Hold Shift and hover over cards to select them for bulk actions.                                                                                           |
+| **Command Palette**       | Keyboard-driven bulk commands on selected cards without leaving the page, including dispatching selected issues to an AI task-runner pipeline.              |
 
 ## Command Palette
 
@@ -70,43 +70,43 @@ Press **Space** while one or more cards are selected (no text input focused). Th
 
 ### Categories
 
-| Category | What it does |
-| --- | --- |
-| Status | Change status of selected cards |
-| Assignee | Reassign selected cards |
-| Tracker | Change tracker of selected cards |
+| Category       | What it does                         |
+| -------------- | ------------------------------------ |
+| Status         | Change status of selected cards      |
+| Assignee       | Reassign selected cards              |
+| Tracker        | Change tracker of selected cards     |
 | Target version | Set target version of selected cards |
-| Reviewer | Set reviewer field |
-| Merged | Set merged-by field |
-| Reviewed | Set reviewed-by field |
-| Bulk Edit | Open the Redmine bulk edit form |
-| Copy | Copy selected card IDs to clipboard |
+| Reviewer       | Set reviewer field                   |
+| Merged         | Set merged-by field                  |
+| Reviewed       | Set reviewed-by field                |
+| Bulk Edit      | Open the Redmine bulk edit form      |
+| Copy           | Copy selected card IDs to clipboard  |
 
 ### Keyboard shortcuts
 
 **Status abbreviations** — type to jump directly to a status:
 
-| Shortcut | Status |
-| --- | --- |
-| `cl` | Closed |
-| `new` | New |
-| `ip` | In Progress |
-| `rs` | Resolved |
-| `fb` | Feedback |
-| `rj` | Rejected |
-| `oh` | On Hold |
-| `co` | Confirmed |
+| Shortcut | Status      |
+| -------- | ----------- |
+| `cl`     | Closed      |
+| `new`    | New         |
+| `ip`     | In Progress |
+| `rs`     | Resolved    |
+| `fb`     | Feedback    |
+| `rj`     | Rejected    |
+| `oh`     | On Hold     |
+| `co`     | Confirmed   |
 
 **Category prefixes** — type to filter to a category, then add a space and continue typing to filter by name within it:
 
-| Prefix | Category |
-| --- | --- |
-| `as` | Assignee |
-| `re` | Reviewer |
-| `tr` | Tracker |
-| `tv` | Target version |
-| `mg` | Merged |
-| `rd` | Reviewed |
+| Prefix | Category       |
+| ------ | -------------- |
+| `as`   | Assignee       |
+| `re`   | Reviewer       |
+| `tr`   | Tracker        |
+| `tv`   | Target version |
+| `mg`   | Merged         |
+| `rd`   | Reviewed       |
 
 **Person name abbreviation** — first letter of first name + first letter of last name + last letter of last name:
 
@@ -117,13 +117,13 @@ Works standalone or after a category prefix (e.g. `as mak`). Abbreviation matche
 
 ### Navigation
 
-| Key | Action |
-| --- | --- |
-| ↑ / ↓ | Navigate the list |
-| **Tab** | Queue the highlighted command as a chip |
-| **Enter** | Execute the highlighted command (or all queued chips at once) |
-| **Backspace** | Remove last queued chip (when input is empty) |
-| **Escape** | Close without executing |
+| Key           | Action                                                        |
+| ------------- | ------------------------------------------------------------- |
+| ↑ / ↓         | Navigate the list                                             |
+| **Tab**       | Queue the highlighted command as a chip                       |
+| **Enter**     | Execute the highlighted command (or all queued chips at once) |
+| **Backspace** | Remove last queued chip (when input is empty)                 |
+| **Escape**    | Close without executing                                       |
 
 ### Batch mode
 
@@ -137,14 +137,18 @@ Open the extension popup to configure:
 - GitLab Base URL (`https://gitlab.example.com`)
 - GitLab API Key (`glpat-...`)
 - Project mapping: one `redmine-project-slug=gitlab_project_id` per line
-- Command Palette: Copy IDs separator (default: ` & `)
+- Command Palette: Copy IDs separator (default: `&`)
+- Claude Dispatch: pipeline execution URL
+  (`https://gitlab.example.com/api/v4/projects/350/trigger/pipeline`)
+  and AI Task Runner pipeline access token. The Redmine project slug is taken
+  from the board URL.
 
 ## Permissions and Privacy
 
-| Permission | Purpose |
-| --- | --- |
-| `storage` | Persist feature toggles and settings locally |
-| `activeTab` | Operate on the current tab |
+| Permission                                       | Purpose                                          |
+| ------------------------------------------------ | ------------------------------------------------ |
+| `storage`                                        | Persist feature toggles and settings locally     |
+| `activeTab`                                      | Operate on the current tab                       |
 | `host_permissions` (`http://*/*`, `https://*/*`) | Support self-hosted Redmine and GitLab instances |
 
 No analytics or telemetry. External network calls are limited to the configured GitLab API (when enabled) and the GitHub Releases API (popup update indicator).
