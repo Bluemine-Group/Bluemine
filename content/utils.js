@@ -57,6 +57,30 @@ function isAgileBoardPage() {
   return Boolean(getCurrentBoardProjectName());
 }
 
+function isIssueEditPage() {
+  if (
+    document.querySelector(
+      '#issue-form, form.edit_issue, form.new_issue, select#issue_assigned_to_id, select[name="issue[assigned_to_id]"]',
+    )
+  ) {
+    return true;
+  }
+
+  const body = document.body;
+  if (!body?.classList.contains("controller-issues")) return false;
+
+  try {
+    const path = new URL(window.location.href).pathname;
+    return (
+      /^\/issues\/\d+(?:\/edit)?\/?$/.test(path) ||
+      /^\/issues\/new\/?$/.test(path) ||
+      /^\/projects\/[^/]+\/issues\/new\/?$/.test(path)
+    );
+  } catch (_error) {
+    return false;
+  }
+}
+
 function normalizePageUrl(rawUrl, baseUrl = window.location.href) {
   try {
     const parsed = new URL(String(rawUrl || "").trim(), baseUrl);

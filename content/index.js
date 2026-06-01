@@ -16,8 +16,12 @@ browserAPI.storage.local.get(
   {
     [GITLAB_MR_FEATURE_KEY]: false,
     [ENHANCED_AGILE_BOARD_FEATURE_KEY]: false,
+    [ENHANCED_ISSUE_EDIT_PAGE_FEATURE_KEY]: false,
     [SHIFT_HOVER_SELECTION_FEATURE_KEY]: false,
     [COMMAND_PALETTE_FEATURE_KEY]: false,
+    [START_CLAUDE_FEATURE_KEY]: false,
+    [START_CLAUDE_PROMPT_PREFIX_KEY]: "",
+    [START_CLAUDE_PROJECT_PATH_MAP_KEY]: "",
   },
   async (result) => {
     if (result[ENHANCED_AGILE_BOARD_FEATURE_KEY] && isAgileBoardPage()) {
@@ -41,6 +45,12 @@ browserAPI.storage.local.get(
       if (result[COMMAND_PALETTE_FEATURE_KEY] && isAgileBoardPage()) {
         runCommandPaletteFeature(result);
       }
+      if (result[START_CLAUDE_FEATURE_KEY] && isAgileBoardPage()) {
+        runStartClaudeButtonFeature(result);
+      }
+      if (result[ENHANCED_ISSUE_EDIT_PAGE_FEATURE_KEY] && isIssueEditPage()) {
+        runEnhancedIssueEditPageFeature();
+      }
       _removeBoardOverlay?.();
       return;
     }
@@ -55,6 +65,12 @@ browserAPI.storage.local.get(
     }
     if (result[COMMAND_PALETTE_FEATURE_KEY] && isAgileBoardPage()) {
       runCommandPaletteFeature(result);
+    }
+    if (result[START_CLAUDE_FEATURE_KEY] && isAgileBoardPage()) {
+      runStartClaudeButtonFeature(result);
+    }
+    if (result[ENHANCED_ISSUE_EDIT_PAGE_FEATURE_KEY] && isIssueEditPage()) {
+      runEnhancedIssueEditPageFeature();
     }
 
     if (result[GITLAB_MR_FEATURE_KEY]) {

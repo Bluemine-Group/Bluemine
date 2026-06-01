@@ -32,6 +32,7 @@
         "content/constants.js",
         "content/utils.js",
         "content/features/enhanced-board.js",
+        "content/features/enhanced-issue-edit.js",
         "content/features/gitlab-mr.js",
         "content/features/shift-hover.js",
         "content/soft-reload.js",

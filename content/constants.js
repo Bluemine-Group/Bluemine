@@ -3,8 +3,22 @@
 const GITLAB_MR_FEATURE_KEY = "feature.gitlabMrStatus.enabled";
 const ENHANCED_AGILE_BOARD_FEATURE_KEY =
   "feature.restoreScrollOnReload.enabled";
+const ENHANCED_ISSUE_EDIT_PAGE_FEATURE_KEY =
+  "feature.enhancedIssueEditPage.enabled";
 const SHIFT_HOVER_SELECTION_FEATURE_KEY = "feature.shiftHoverSelection.enabled";
 const COMMAND_PALETTE_FEATURE_KEY = "feature.commandPalette.enabled";
+const START_CLAUDE_FEATURE_KEY = "feature.startClaude.enabled";
+// Claude Code deep links: claude-cli://open with optional q / cwd params.
+const START_CLAUDE_DEEPLINK_BASE = "claude-cli://open";
+const START_CLAUDE_PROMPT_PREFIX_KEY = "settings.startClaude.promptPrefix";
+// One `redmine-project-slug=/local/path` per line; the working directory for
+// the deep link's cwd is looked up by the current board's project slug.
+const START_CLAUDE_PROJECT_PATH_MAP_KEY = "settings.startClaude.projectPathMap";
+// Claude Code deep links cap the `q` (prompt) parameter at 5,000 characters.
+const START_CLAUDE_MAX_PROMPT_LENGTH = 5000;
+const START_CLAUDE_STYLE_ID = "bluemine-start-claude-style";
+const START_CLAUDE_BUTTON_CLASS = "bluemine-start-claude-btn";
+const START_CLAUDE_TOOLS_CLASS = "bluemine-start-claude-tools";
 const COMMAND_PALETTE_OVERLAY_ID = "bluemine-command-palette-overlay";
 const COMMAND_PALETTE_STYLE_ID = "bluemine-command-palette-style";
 const COMMAND_PALETTE_CATEGORIES = new Set([

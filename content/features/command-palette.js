@@ -378,13 +378,13 @@ function runCommandPaletteFeature(featureResult) {
       for (let index = 0; index < selectedIds.length; index += 1) {
         const issueId = selectedIds[index];
         setCommandPaletteStatus(
-          `Dispatching to Claude ${index + 1}/${selectedIds.length}...`,
+          `Running Autofix ${index + 1}/${selectedIds.length}...`,
         );
         const response = await dispatchIssueToClaude(issueId);
         if (!response?.ok) {
           dispatchFailures.push({
             issueId,
-            error: response?.error || "Could not dispatch task to Claude",
+            error: response?.error || "Could not run Autofix",
           });
         }
       }
@@ -737,7 +737,7 @@ function runCommandPaletteFeature(featureResult) {
               {
                 id: "dispatch-to-claude",
                 category: "AI",
-                label: "Dispatch to Claude the intern",
+                label: "Fix with Autofix",
                 disabled: selectedIds.length === 0,
                 action: { type: "dispatchClaude" },
               },

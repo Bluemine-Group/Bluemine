@@ -51,6 +51,7 @@ const CLAUDE_DISPATCH_PIPELINE_EXECUTION_URL_KEY =
   "settings.claudeDispatch.pipelineExecutionUrl";
 const CLAUDE_DISPATCH_TRIGGER_TOKEN_KEY =
   "settings.claudeDispatch.triggerToken";
+const FIX_WITH_AUTOFIX_FEATURE_KEY = "feature.fixWithAutofix.enabled";
 const GITLAB_MR_FEATURE_KEY = "feature.gitlabMrStatus.enabled";
 const GITLAB_MR_CACHE_KEY = "cache.gitlabMergeRequests.v1";
 const GITLAB_AVATAR_CACHE_KEY = "cache.gitlabAssigneeAvatars.v1";
@@ -176,7 +177,7 @@ browserAPI.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       .catch((error) => {
         sendResponse({
           ok: false,
-          error: error.message || "Could not dispatch task to Claude",
+          error: error.message || "Could not run Autofix",
           status: Number(error.status) || undefined
         });
       });
@@ -354,6 +355,7 @@ async function getGitlabProjectSettings(redmineProjectName) {
 
 async function getClaudeDispatchSettings(redmineProjectName) {
   const settings = await getLocalSettings({
+    [FIX_WITH_AUTOFIX_FEATURE_KEY]: null,
     [CLAUDE_DISPATCH_PIPELINE_EXECUTION_URL_KEY]: "",
     [CLAUDE_DISPATCH_TRIGGER_TOKEN_KEY]: "",
   });
@@ -364,6 +366,15 @@ async function getClaudeDispatchSettings(redmineProjectName) {
   const triggerToken = String(
     settings[CLAUDE_DISPATCH_TRIGGER_TOKEN_KEY] || "",
   ).trim();
+  const explicitAutofixEnabled = settings[FIX_WITH_AUTOFIX_FEATURE_KEY];
+  const isAutofixEnabled =
+    typeof explicitAutofixEnabled === "boolean"
+      ? explicitAutofixEnabled
+      : Boolean(pipelineExecutionUrl && triggerToken);
+  if (!isAutofixEnabled) {
+    return null;
+  }
+
   if (!pipelineExecutionUrl || !triggerToken || !redmineProjectName) {
     return null;
   }
@@ -383,7 +394,7 @@ async function dispatchTaskToClaude({
   const dispatchSettings = await getClaudeDispatchSettings(redmineProjectName);
   if (!dispatchSettings) {
     const missingSettingsError = new Error(
-      "Claude dispatch is not configured for this Redmine project",
+      "Autofix is disabled or not configured for this Redmine project",
     );
     missingSettingsError.status = 400;
     throw missingSettingsError;
@@ -405,7 +416,7 @@ async function dispatchTaskToClaude({
   if (!response.ok) {
     const responseText = await response.text().catch(() => "");
     const error = new Error(
-      `Claude dispatch failed (${response.status})${responseText ? `: ${responseText}` : ""}`,
+      `Autofix failed (${response.status})${responseText ? `: ${responseText}` : ""}`,
     );
     error.status = response.status;
     throw error;

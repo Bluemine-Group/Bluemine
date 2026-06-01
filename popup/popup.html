@@ -145,6 +145,24 @@
       <section class="glass-group">
         <label
           class="setting-row toggle-row"
+          for="enhanced-issue-edit-page-toggle"
+        >
+          <span class="row-copy">
+            <span class="setting-title">Enhanced Issue edit page</span>
+            <span class="setting-subtitle"
+              >– Add Assign random next to the issue assignee selector</span
+            >
+          </span>
+          <span class="switch-shell">
+            <input id="enhanced-issue-edit-page-toggle" type="checkbox" />
+            <span class="switch-ui" aria-hidden="true"></span>
+          </span>
+        </label>
+      </section>
+
+      <section class="glass-group">
+        <label
+          class="setting-row toggle-row"
           for="shift-hover-selection-toggle"
         >
           <span class="row-copy">
@@ -197,22 +215,97 @@
       </section>
 
       <section class="glass-group">
-        <div class="setting-row">
+        <label class="setting-row toggle-row" for="start-claude-toggle">
           <span class="row-copy">
-            <span class="setting-title">Claude the intern</span>
+            <span class="setting-title">Start Claude Code</span>
+            <span class="setting-subtitle">
+              Adds a button to Agile board cards that opens a deeplink to start
+              Claude Code with the task's title and description
+            </span>
+          </span>
+          <span class="switch-shell">
+            <input id="start-claude-toggle" type="checkbox" />
+            <span class="switch-ui" aria-hidden="true"></span>
+          </span>
+        </label>
+
+        <div
+          id="start-claude-settings"
+          class="conditional-settings is-hidden"
+          aria-hidden="true"
+        >
+          <div class="stack-field">
+            <label class="field-name" for="start-claude-path-map"
+              >Project folders (one per line)</label
+            >
+            <textarea
+              id="start-claude-path-map"
+              class="stack-input"
+              placeholder="redmine-project=/Users/you/code/project&#10;another-project=/Users/you/code/another"
+              spellcheck="false"
+            ></textarea>
+            <span class="setting-subtitle">
+              Maps each Redmine project slug (from the board URL) to a folder on
+              your computer; Claude opens there. Projects without a mapping open
+              in your home directory.
+            </span>
+          </div>
+
+          <div class="stack-field">
+            <label class="field-name" for="start-claude-prompt-prefix"
+              >Prompt prefix (optional)</label
+            >
+            <textarea
+              id="start-claude-prompt-prefix"
+              class="stack-input"
+              placeholder="e.g. Work on this Redmine task:"
+              spellcheck="false"
+            ></textarea>
+            <span class="setting-subtitle">
+              Added before the task's title and description. Leave empty to send
+              just the title and description.
+            </span>
+          </div>
+
+          <div class="actions">
+            <span
+              id="start-claude-status"
+              class="status"
+              aria-live="polite"
+              role="status"
+            ></span>
+            <button id="save-start-claude-settings" type="button" class="button">
+              Save Start Claude Code Settings
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section class="glass-group">
+        <label class="setting-row toggle-row" for="autofix-toggle">
+          <span class="row-copy">
+            <span class="setting-title">Fix with Autofix</span>
             <span class="setting-subtitle"
-              >Dispatch easy work to Claude the intern</span
+              >Dispatch selected Agile board cards to the Autofix pipeline</span
             >
           </span>
-        </div>
+          <span class="switch-shell">
+            <input id="autofix-toggle" type="checkbox" />
+            <span class="switch-ui" aria-hidden="true"></span>
+          </span>
+        </label>
 
-        <div class="conditional-settings">
+        <div
+          id="autofix-settings"
+          class="conditional-settings is-hidden"
+          aria-hidden="true"
+        >
           <div class="input-row">
-            <label class="field-name" for="claude-pipeline-url"
+            <label class="field-name" for="autofix-pipeline-url"
               >Pipeline Execution URL</label
             >
             <input
-              id="claude-pipeline-url"
+              id="autofix-pipeline-url"
               class="row-input"
               type="url"
               placeholder=""
@@ -221,11 +314,11 @@
           </div>
 
           <div class="input-row">
-            <label class="field-name" for="claude-trigger-token"
+            <label class="field-name" for="autofix-trigger-token"
               >Pipeline Access Token</label
             >
             <input
-              id="claude-trigger-token"
+              id="autofix-trigger-token"
               class="row-input"
               type="password"
               placeholder=""
@@ -235,13 +328,13 @@
 
           <div class="actions">
             <span
-              id="claude-status"
+              id="autofix-status"
               class="status"
               aria-live="polite"
               role="status"
             ></span>
-            <button id="save-claude-settings" type="button" class="button">
-              Save Claude Settings
+            <button id="save-autofix-settings" type="button" class="button">
+              Save Autofix Settings
             </button>
           </div>
         </div>

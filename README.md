@@ -61,8 +61,11 @@ No build step required.
 | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **GitLab MR integration** | Shows merge request status on Agile board cards and issue pages.                                                                                           |
 | **Enhanced Agile board**  | Soft-reloads the board in place after actions (preserving scroll), restores collapsed swimlane state across refreshes, and adds a collapse/expand toolbar. |
+| **Enhanced Issue edit page** | Adds small issue edit-page improvements, starting with an Assign random assignee button.                                                                 |
 | **Shift+Hover selection** | Hold Shift and hover over cards to select them for bulk actions.                                                                                           |
-| **Command Palette**       | Keyboard-driven bulk commands on selected cards without leaving the page, including dispatching selected issues to an AI task-runner pipeline.              |
+| **Command Palette**       | Keyboard-driven bulk commands on selected cards without leaving the page.                                                                                   |
+| **Start Claude Code**     | Adds a button to Agile board cards that opens a deeplink launching Claude Code with the task's title and description.                                      |
+| **Fix with Autofix**      | Adds a command palette action that dispatches selected issues to an AI task-runner pipeline.                                                               |
 
 ## Command Palette
 
@@ -133,12 +136,23 @@ Tab queues commands as chips. Multiple commands from different categories are me
 
 Open the extension popup to configure:
 
-- Feature toggles (GitLab MR, Enhanced Agile board, Shift+Hover, Command Palette)
+- Feature toggles (GitLab MR, Enhanced Agile board, Enhanced Issue edit page, Shift+Hover, Command Palette, Start Claude Code, Fix with Autofix)
 - GitLab Base URL (`https://gitlab.example.com`)
 - GitLab API Key (`glpat-...`)
 - Project mapping: one `redmine-project-slug=gitlab_project_id` per line
 - Command Palette: Copy IDs separator (default: `&`)
-- Claude Dispatch: pipeline execution URL
+- Start Claude Code: builds a [Claude Code deep link](https://code.claude.com/docs/en/deep-links)
+  (`claude-cli://open`) from simple fields — no URL to hand-write:
+  - **Project folders** — one `redmine-project-slug=/local/path` per line. The
+    folder for the current board's project becomes the session's working
+    directory; unmapped projects open in your home directory.
+  - **Prompt prefix** (optional) — text added before the task's title and
+    description
+
+  The task's title and description always fill the prompt (capped at 5,000
+  characters). Requires Claude Code v2.1.91+, which registers the
+  `claude-cli://` handler on first run.
+- Fix with Autofix: pipeline execution URL
   (`https://gitlab.example.com/api/v4/projects/350/trigger/pipeline`)
   and AI Task Runner pipeline access token. The Redmine project slug is taken
   from the board URL.
