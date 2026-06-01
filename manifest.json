@@ -37,6 +37,7 @@
         "content/soft-reload.js",
         "content/features/command-palette.js",
         "content/features/context-menu.js",
+        "content/features/start-claude.js",
         "content/index.js"
       ],
       "run_at": "document_idle"
